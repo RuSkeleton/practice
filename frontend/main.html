@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Вход в систему</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a, #1a1a3e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+        }
+        .login-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; padding: 20px; }
+        .login-box {
+            background: #16213e;
+            padding: 50px 60px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            max-width: 420px;
+            width: 100%;
+        }
+        .login-box h1 { font-size: 1.8em; color: #4a9eff; text-align: center; margin-bottom: 8px; }
+        .login-box .subtitle { font-size: 1em; color: #6a7a9a; text-align: center; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 6px; color: #a0b4d0; font-size: 14px; }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #2a3a5e;
+            border-radius: 8px;
+            background: #0f1a2e;
+            color: #fff;
+            font-size: 16px;
+        }
+        .form-group input:focus { outline: none; border-color: #4a9eff; }
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: #4a9eff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .btn-primary:hover { background: #3a7ecc; }
+        .login-message { margin-top: 16px; padding: 10px; border-radius: 6px; text-align: center; font-size: 14px; }
+        .login-message.error { background: #3a1a1a; color: #ff6b6b; }
+        .login-message.success { background: #1a3a2a; color: #7ddfa0; }
+        .login-footer { margin-top: 20px; text-align: center; color: #4a5a7a; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-box">
+            <h1>Цифровые информационные панели</h1>
+            <p class="subtitle">Вход в систему</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Логин</label>
+                    <input type="text" id="username" placeholder="Введите логин" value="hr" required />
+                </div>
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" placeholder="Введите пароль" value="12345" required />
+                </div>
+                <button type="submit" class="btn-primary">Войти</button>
+                <div id="loginMessage" class="login-message"></div>
+            </form>
+            <div class="login-footer">Демо-доступ: HR / 12345</div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('loginMessage');
+
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                const response = await fetch(API_BASE + '/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('token', data.access_token);
+                    msg.textContent = 'Успешный вход! Перенаправление...';
+                    msg.className = 'login-message success';
+                    setTimeout(() => { window.location.href = 'admin.html'; }, 800);
+                } else {
+                    const error = await response.json();
+                    msg.textContent = 'Ошибка: ' + (error.detail || 'Неверный логин или пароль');
+                    msg.className = 'login-message error';
+                }
+            } catch (error) {
+                msg.textContent = 'Ошибка подключения к серверу';
+                msg.className = 'login-message error';
+            }
+        });
+    </script>
+</body>
+</html>

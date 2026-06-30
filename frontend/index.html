@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Информационная панель</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a1a;
+            color: #fff;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            user-select: none;
+        }
+        ::-webkit-scrollbar { display: none; }
+        * { scrollbar-width: none; }
+
+        .code-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            display: flex; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, #0a0a1a, #1a1a3e);
+            z-index: 1000;
+        }
+        .code-container {
+            background: #16213e; padding: 50px 60px; border-radius: 24px;
+            text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            max-width: 500px; width: 90%;
+        }
+        .code-container h1 { font-size: 2.5em; margin-bottom: 8px; }
+        .code-container .subtitle { color: #6a7a9a; margin-bottom: 30px; font-size: 1.1em; }
+        .code-input-group { display: flex; gap: 12px; justify-content: center; }
+        .code-input-group input {
+            width: 120px; padding: 16px 20px; font-size: 2em; text-align: center;
+            font-family: monospace; border: 2px solid #2a3a5e; border-radius: 12px;
+            background: #0f1a2e; color: #fff; letter-spacing: 8px; outline: none;
+        }
+        .code-input-group input:focus { border-color: #4a9eff; }
+        .code-input-group button {
+            padding: 16px 32px; font-size: 1.2em; background: #4a9eff;
+            color: #fff; border: none; border-radius: 12px; cursor: pointer; font-weight: 600;
+        }
+        .code-status { margin-top: 16px; min-height: 1.5em; }
+        .code-status.success { color: #27ae60; }
+        .code-status.error { color: #ff6b6b; }
+        .code-help { margin-top: 20px; color: #4a5a7a; }
+
+        .slide-container {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            display: flex; justify-content: center; align-items: center;
+            background: #0a0a1a; overflow: hidden;
+        }
+        .slide-container .slide {
+            width: 100%; height: 100%; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 60px; text-align: center;
+            animation: fadeIn 0.8s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+
+        .slide-text { background: linear-gradient(135deg, #1a237e, #0d47a1); color: #fff; }
+        .slide-text h1 { font-size: 4em; margin-bottom: 20px; }
+        .slide-text p { font-size: 2.2em; }
+
+        .slide-greeting { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
+        .slide-greeting h1 { font-size: 3em; }
+        .slide-greeting h2 { font-size: 4.5em; margin: 10px 0; }
+        .slide-greeting p { font-size: 2em; }
+
+        .slide-metric { background: #0a0a1a; color: #00ff88; font-family: 'Courier New', monospace; }
+        .slide-metric h2 { font-size: 2.5em; color: #6a7a9a; }
+        .slide-metric h1 { font-size: 8em; background: linear-gradient(45deg, #ffd700, #ff6b00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .slide-metric .trend.up { color: #00ff88; }
+        .slide-metric .trend.down { color: #ff4444; }
+
+        .slide-image { background: #1a1a2e; color: #fff; }
+        .slide-image img { max-width: 70%; max-height: 60vh; border-radius: 12px; }
+
+        .status-bar {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+            padding: 8px 24px; border-radius: 20px; font-size: 13px; color: #6a7a9a;
+            display: flex; gap: 24px; align-items: center; z-index: 100;
+        }
+        #statusIndicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #27ae60; animation: pulse 2s infinite; }
+        #statusIndicator.offline { background: #e74c3c; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        #screenCodeDisplay { font-family: monospace; font-weight: bold; color: #4a9eff; }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            .code-container { padding: 30px 20px; }
+            .code-container h1 { font-size: 1.8em; }
+            .code-input-group { flex-direction: column; align-items: center; }
+            .code-input-group input { width: 100%; max-width: 200px; }
+            .code-input-group button { width: 100%; max-width: 200px; }
+            .slide-text h1 { font-size: 2.5em; }
+            .slide-text p { font-size: 1.5em; }
+            .slide-metric h1 { font-size: 4em; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="codeScreen" class="code-screen">
+            <div class="code-container">
+                <h1>Введите код доступа</h1>
+                <p class="subtitle">Спросите код у HR-менеджера</p>
+                <div class="code-input-group">
+                    <input type="text" id="codeInput" maxlength="3" placeholder="000" autofocus />
+                    <button id="codeSubmitBtn">Подключиться</button>
+                </div>
+                <div id="codeStatus" class="code-status"></div>
+                <div class="code-help"><small>Код состоит из 3 цифр</small></div>
+            </div>
+        </div>
+
+        <div id="slideContainer" class="slide-container hidden">
+            <div class="loading-screen">
+                <h1>Загрузка...</h1>
+                <p>Подключение к серверу</p>
+            </div>
+        </div>
+
+        <div id="statusBar" class="status-bar hidden">
+            <span id="statusIndicator"></span>
+            <span id="statusText">Подключено</span>
+            <span id="slideCounter">1 / 0</span>
+            <span id="screenCodeDisplay"></span>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        const WS_URL = 'ws://' + window.location.host + '/ws/slides';
+
+        const codeScreen = document.getElementById('codeScreen');
+        const slideContainer = document.getElementById('slideContainer');
+        const statusBar = document.getElementById('statusBar');
+        const codeInput = document.getElementById('codeInput');
+        const codeSubmitBtn = document.getElementById('codeSubmitBtn');
+        const codeStatus = document.getElementById('codeStatus');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const slideCounter = document.getElementById('slideCounter');
+        const screenCodeDisplay = document.getElementById('screenCodeDisplay');
+
+        let slides = [];
+        let currentIndex = 0;
+        let ws = null;
+        let slideInterval = null;
+        let screenCode = localStorage.getItem('screen_code');
+        let reconnectTimeout = null;
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F11' || e.key === 'Escape' || e.key === 'F5' || e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+            if (e.ctrlKey && (e.key === 'r' || e.key === 'R' || e.key === 'w' || e.key === 'W')) {
+                e.preventDefault();
+                return false;
+            }
+        }, false);
+        document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
+        document.addEventListener('dblclick', function(e) { e.preventDefault(); return false; });
+
+        window.addEventListener('beforeunload', function() {
+            if (ws) {
+                try {
+                    ws.close();
+                } catch (e) {}
+                ws = null;
+            }
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+        });
+
+        async function init() {
+            if (screenCode) {
+                const activated = await activateScreen(screenCode);
+                if (activated) {
+                    showPlayer();
+                    loadSlides();
+                    startSlideshow();
+                    connectWebSocket();
+                    return;
+                }
+                localStorage.removeItem('screen_code');
+                screenCode = null;
+            }
+            showCodeInput();
+        }
+
+        function showCodeInput() {
+            codeScreen.classList.remove('hidden');
+            slideContainer.classList.add('hidden');
+            statusBar.classList.add('hidden');
+            codeInput.value = '';
+            codeInput.focus();
+            codeStatus.textContent = '';
+            codeStatus.className = 'code-status';
+        }
+
+        function showPlayer() {
+            codeScreen.classList.add('hidden');
+            slideContainer.classList.remove('hidden');
+            statusBar.classList.remove('hidden');
+            screenCodeDisplay.textContent = 'Код: ' + screenCode;
+        }
+
+        async function activateScreen(code) {
+            try {
+                const response = await fetch(API_BASE + '/screens/activate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+                if (response.ok) {
+                    localStorage.setItem('screen_code', code);
+                    screenCode = code;
+                    return true;
+                }
+                const err = await response.json();
+                showError(err.detail || 'Ошибка активации');
+                return false;
+            } catch {
+                showError('Ошибка соединения с сервером');
+                return false;
+            }
+        }
+
+        function showError(msg) {
+            codeStatus.textContent = 'Ошибка: ' + msg;
+            codeStatus.className = 'code-status error';
+            codeInput.value = '';
+            codeInput.focus();
+        }
+
+        function showSuccess(msg) {
+            codeStatus.textContent = msg;
+            codeStatus.className = 'code-status success';
+        }
+
+        codeSubmitBtn.addEventListener('click', async function() {
+            const code = codeInput.value.trim();
+            if (code.length !== 3 || !/^\d{3}$/.test(code)) {
+                showError('Введите ровно 3 цифры');
+                return;
+            }
+            codeStatus.textContent = 'Подключение...';
+            codeStatus.className = 'code-status loading';
+            codeSubmitBtn.disabled = true;
+            const activated = await activateScreen(code);
+            codeSubmitBtn.disabled = false;
+            if (activated) {
+                showSuccess('Подключено!');
+                setTimeout(function() {
+                    showPlayer();
+                    loadSlides();
+                    startSlideshow();
+                    connectWebSocket();
+                }, 500);
+            }
+        });
+
+        codeInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { codeSubmitBtn.click(); }
+        });
+        codeInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').slice(0, 3);
+            if (this.value.length === 3) {
+                setTimeout(function() { codeSubmitBtn.click(); }, 300);
+            }
+        });
+
+        async function loadSlides() {
+            try {
+                const response = await fetch(API_BASE + '/slides/active');
+                const data = await response.json();
+                if (data.length > 0) {
+                    slides = data;
+                    localStorage.setItem('cached_slides', JSON.stringify({ data: slides, timestamp: Date.now() }));
+                    if (currentIndex >= slides.length) { currentIndex = 0; }
+                    showSlide(currentIndex);
+                    updateStatus(true);
+                } else {
+                    const cached = localStorage.getItem('cached_slides');
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        if (Date.now() - parsed.timestamp < 3600000) {
+                            slides = parsed.data;
+                            showSlide(0);
+                            updateStatus(true, true);
+                            return;
+                        }
+                    }
+                    showEmptyState();
+                }
+            } catch {
+                const cached = localStorage.getItem('cached_slides');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    slides = parsed.data;
+                    if (slides.length > 0) {
+                        showSlide(0);
+                        updateStatus(false, true);
+                        return;
+                    }
+                }
+                showEmptyState();
+                updateStatus(false);
+            }
+        }
+
+        function showSlide(index) {
+            if (!slides || slides.length === 0) { showEmptyState(); return; }
+            const slide = slides[index];
+            if (!slide) { showEmptyState(); return; }
+            let html = '';
+            const extra = slide.extra_data || {};
+            switch (slide.type) {
+                case 'text':
+                    html = '<div class="slide slide-text"><h1>' + (slide.title || 'Объявление') + '</h1><p>' + (slide.content || '') + '</p></div>';
+                    break;
+                case 'greeting':
+                    html = '<div class="slide slide-greeting"><h1>Поздравляем!</h1><h2>' + (extra.name || slide.title || 'Сотрудник') + '</h2><p>' + (extra.reason || slide.content || 'С праздником!') + '</p></div>';
+                    break;
+                case 'metric':
+                    const trendIcon = extra.trend === 'up' ? '▲' : extra.trend === 'down' ? '▼' : '●';
+                    html = '<div class="slide slide-metric"><h2>' + (slide.title || 'Показатель') + '</h2><h1>' + (slide.content || '0') + '</h1><div class="trend ' + (extra.trend || 'stable') + '">' + trendIcon + ' ' + (extra.trend || 'stable') + '</div></div>';
+                    break;
+                case 'image':
+                    html = '<div class="slide slide-image"><img src="' + (slide.content || '') + '" alt="' + (slide.title || 'Изображение') + '"><p>' + (slide.title || '') + '</p></div>';
+                    break;
+                default:
+                    html = '<div class="slide slide-text"><h1>' + (slide.title || 'Слайд') + '</h1><p>' + (slide.content || '') + '</p></div>';
+            }
+            slideCounter.textContent = (index + 1) + ' / ' + slides.length;
+            slideContainer.innerHTML = html;
+            slideContainer.style.animation = 'none';
+            requestAnimationFrame(function() {
+                slideContainer.style.animation = 'fadeIn 0.8s ease';
+            });
+        }
+
+        function showEmptyState() {
+            slideContainer.innerHTML = '<div class="loading-screen"><h1>Нет активных слайдов</h1><p>Ожидайте обновлений</p></div>';
+            slideCounter.textContent = '0 / 0';
+        }
+
+        function nextSlide() {
+            if (slides.length === 0) { loadSlides(); return; }
+            currentIndex = (currentIndex + 1) % slides.length;
+            showSlide(currentIndex);
+        }
+
+        function updateStatus(online, cached) {
+            if (online) {
+                statusIndicator.className = '';
+                statusText.textContent = cached ? 'Из кэша' : 'Подключено';
+            } else {
+                statusIndicator.className = 'offline';
+                statusText.textContent = 'Офлайн (кэш)';
+            }
+        }
+
+        function connectWebSocket() {
+            if (ws) {
+                try {
+                    ws.close();
+                } catch (e) {}
+                ws = null;
+            }
+
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+
+            try {
+                ws = new WebSocket(WS_URL);
+                
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    if (screenCode) {
+                        ws.send(JSON.stringify({ type: 'register', code: screenCode }));
+                    }
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'update' || data.type === 'slide_created' || data.type === 'screen_connected') {
+                            loadSlides();
+                        }
+                    } catch (e) {
+                        console.error('WebSocket message error:', e);
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    console.log('WebSocket closed, code:', event.code);
+                    ws = null;
+                    if (event.code !== 1000) {
+                        reconnectTimeout = setTimeout(function() {
+                            connectWebSocket();
+                        }, 5000);
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    if (ws) {
+                        try {
+                            ws.close();
+                        } catch (e) {}
+                        ws = null;
+                    }
+                };
+            } catch (error) {
+                console.error('WebSocket connection failed:', error);
+                reconnectTimeout = setTimeout(function() {
+                    connectWebSocket();
+                }, 5000);
+            }
+        }
+
+        function startSlideshow() {
+            if (slideInterval) { clearInterval(slideInterval); }
+            slideInterval = setInterval(nextSlide, 15000);
+            setInterval(loadSlides, 300000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
