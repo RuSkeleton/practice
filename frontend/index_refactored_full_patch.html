@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Информационная панель</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #07111f;
+            color: #fff;
+            overflow: hidden;
+            user-select: none;
+        }
+        .hidden { display: none !important; }
+
+        .code-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 25% 20%, #244a80 0, transparent 35%), linear-gradient(135deg, #07111f, #121b33 70%);
+        }
+        .code-card {
+            width: min(520px, 92vw);
+            padding: 44px 48px;
+            border-radius: 28px;
+            background: rgba(14, 27, 48, 0.94);
+            box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .code-card h1 { font-size: 2.35rem; margin-bottom: 10px; }
+        .code-card p { color: #9eb0ca; margin-bottom: 28px; }
+        .code-row { display: flex; justify-content: center; gap: 12px; }
+        #codeInput {
+            width: 132px;
+            padding: 15px 18px;
+            border-radius: 14px;
+            border: 2px solid #344a6f;
+            background: #07111f;
+            color: #fff;
+            font-size: 2rem;
+            text-align: center;
+            letter-spacing: 8px;
+            outline: none;
+            font-family: monospace;
+        }
+        #codeInput:focus { border-color: #66a8ff; }
+        #codeSubmitBtn {
+            padding: 15px 28px;
+            border: 0;
+            border-radius: 14px;
+            background: #2f8cff;
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        #codeSubmitBtn:disabled { opacity: 0.6; cursor: wait; }
+        #codeStatus { min-height: 26px; margin-top: 18px; color: #9eb0ca; }
+        #codeStatus.error { color: #ff7b7b; }
+        #codeStatus.success { color: #72e38f; }
+        .code-note { margin-top: 18px; color: #6e809b; font-size: 0.92rem; }
+
+        .slide-root {
+            position: fixed;
+            inset: 0;
+            background: #07111f;
+            overflow: hidden;
+        }
+        .slide-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: top left;
+            background: linear-gradient(135deg, #07111f, #111c33);
+            animation: appear 0.35s ease;
+        }
+        @keyframes appear {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .bg-default { background: linear-gradient(135deg, #07111f, #111c33); }
+        .bg-announcement { background: linear-gradient(135deg, #173a71, #071b35 75%); }
+        .bg-urgent { background: linear-gradient(135deg, #852121, #2a0710 75%); }
+        .bg-image { background: linear-gradient(135deg, #111827, #020617 75%); }
+        .bg-greeting { background: radial-gradient(circle at 50% 15%, rgba(255,255,255,0.20), transparent 28%), linear-gradient(135deg, #b83a7d, #6e2fc9); }
+        .bg-metric { background: linear-gradient(135deg, #05110c, #0d2a1d 75%); }
+        .bg-light { background: linear-gradient(135deg, #f8fafc, #dbeafe); color: #0f172a; }
+
+        .slide-element {
+            position: absolute;
+            overflow: hidden;
+            color: inherit;
+        }
+        .slide-element.role-muted { opacity: 0.78; }
+        .slide-text {
+            display: flex;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.15;
+        }
+        .slide-text.align-left { text-align: left; justify-content: flex-start; }
+        .slide-text.align-center { text-align: center; justify-content: center; }
+        .slide-text.align-right { text-align: right; justify-content: flex-end; }
+        .slide-text.valign-top { align-items: flex-start; }
+        .slide-text.valign-middle { align-items: center; }
+        .slide-text.valign-bottom { align-items: flex-end; }
+        .slide-image-element img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+        .slide-image-element.fit-cover img { object-fit: cover; }
+        .slide-image-element.fit-fill img { object-fit: fill; }
+        .slide-image-element.shape-rounded img { border-radius: 28px; }
+        .slide-image-element.shape-circle img { border-radius: 50%; }
+        .slide-image-element.shadow-soft img { box-shadow: 0 24px 70px rgba(0,0,0,0.45); }
+        .slide-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 24px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            border: 1px solid rgba(255,255,255,0.20);
+            backdrop-filter: blur(10px);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .slide-chart {
+            background: rgba(0,0,0,0.18);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 28px;
+            padding: 28px;
+        }
+        .slide-chart canvas { width: 100%; height: 100%; display: block; }
+        .metric-value {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Consolas, "Courier New", monospace;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .empty-state, .loading-state {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #dbe8ff;
+            background: linear-gradient(135deg, #07111f, #111c33);
+            padding: 7vh 7vw;
+        }
+        .empty-state h1, .loading-state h1 { font-size: clamp(2.5rem, 6vw, 6rem); margin-bottom: 0.25em; }
+        .empty-state p, .loading-state p { font-size: clamp(1.2rem, 2.2vw, 2.5rem); color: #9eb0ca; }
+
+        .status-bar {
+            position: fixed;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            max-width: 94vw;
+            padding: 8px 18px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.58);
+            color: #b5c2d8;
+            font-size: 13px;
+            backdrop-filter: blur(12px);
+            white-space: nowrap;
+        }
+        #statusIndicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #72e38f;
+            box-shadow: 0 0 14px #72e38f;
+        }
+        #statusIndicator.offline { background: #ff7b7b; box-shadow: 0 0 14px #ff7b7b; }
+        #statusIndicator.cached { background: #ffd36a; box-shadow: 0 0 14px #ffd36a; }
+        #screenCodeDisplay, #slideCounter { font-family: Consolas, monospace; color: #dbe8ff; }
+
+        @media (max-width: 768px) {
+            .code-card { padding: 32px 22px; }
+            .code-row { flex-direction: column; align-items: center; }
+            #codeInput, #codeSubmitBtn { width: min(230px, 100%); }
+            .status-bar { font-size: 11px; gap: 9px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="codeScreen" class="code-screen">
+        <div class="code-card">
+            <h1>Код экрана</h1>
+            <p>Введите 3-значный код, выданный HR. После первой привязки экран сможет работать из локального кэша.</p>
+            <div class="code-row">
+                <input id="codeInput" maxlength="3" placeholder="000" inputmode="numeric" autocomplete="off" autofocus />
+                <button id="codeSubmitBtn">Подключить</button>
+            </div>
+            <div id="codeStatus"></div>
+            <div class="code-note">Для выхода из полноэкранного режима используйте системные средства устройства.</div>
+        </div>
+    </div>
+
+    <main id="slideRoot" class="slide-root hidden">
+        <div class="loading-state">
+            <h1>Загрузка...</h1>
+            <p>Подготовка экрана</p>
+        </div>
+    </main>
+
+    <div id="statusBar" class="status-bar hidden">
+        <span id="statusIndicator"></span>
+        <span id="statusText">Запуск</span>
+        <span id="slideCounter">0 / 0</span>
+        <span id="screenCodeDisplay"></span>
+        <span id="cacheInfo">Кэш: пусто</span>
+    </div>
+
+    <script>
+        "use strict";
+
+        // =========================================================
+        // CONFIG
+        // =========================================================
+
+        const CONFIG = Object.freeze({
+            API_BASE: window.location.origin + "/api",
+            WS_URL: (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/ws/screens",
+            CANVAS_WIDTH: 1920,
+            CANVAS_HEIGHT: 1080,
+            SCHEDULE_DAYS: 3,
+            PLAYER_MIN_DELAY_MS: 250,
+            PLAYER_FALLBACK_DELAY_MS: 1000,
+            REFRESH_INTERVAL_MS: 5 * 60 * 1000,
+            DAILY_FULL_SYNC_INTERVAL_MS: 24 * 60 * 60 * 1000,
+            FULL_SYNC_EXPIRY_THRESHOLD_MS: 12 * 60 * 60 * 1000,
+            RECONNECT_DELAY_MS: 5000,
+            SCREEN_CODE_KEY: "digital_signage_screen_code",
+            SERVER_OFFSET_KEY: "digital_signage_server_offset_ms",
+            CACHE_PREFIX: "digital_signage_screen_client_v3",
+            IMAGE_CACHE_NAME: "digital_signage_images_v2"
+        });
+
+        const ENDPOINTS = Object.freeze({
+            activate: () => "/screens/activate",
+            fullSchedule: code => "/screens/" + encodeURIComponent(code) + "/schedule?mode=full&days=" + CONFIG.SCHEDULE_DAYS,
+            patchSchedule: (code, from, to, baseVersion) => {
+                const params = new URLSearchParams({
+                    mode: "patch",
+                    from: String(from || ""),
+                    to: String(to || ""),
+                    base_version: String(baseVersion || 0)
+                });
+                return "/screens/" + encodeURIComponent(code) + "/schedule?" + params.toString();
+            },
+            slidesBatch: () => "/slides/batch"
+        });
+
+        // Expected REST contract:
+        // POST /api/screens/activate                         body: { code }
+        // GET  /api/screens/{code}/schedule?mode=full&days=3 response: full schedule snapshot
+        // GET  /api/screens/{code}/schedule?mode=patch&from=...&to=...&base_version=... response: schedule patch
+        // POST /api/slides/batch                            body: { ids: [] }, response: { slides: [], missing_ids: [] }
+        // WebSocket /ws/screens: register/registered/ping/pong/schedule_updated/slides_updated/screen_disabled.
+
+        // =========================================================
+        // STATE
+        // =========================================================
+
+        const state = {
+            screenCode: localStorage.getItem(CONFIG.SCREEN_CODE_KEY) || "",
+            serverOnline: false,
+            schedule: null,
+            scheduleVersion: 0,
+            scheduleSavedAt: "",
+            lastFullSyncAt: "",
+            slidesById: new Map(),
+            slidesSavedAt: "",
+            serverOffsetMs: Number(localStorage.getItem(CONFIG.SERVER_OFFSET_KEY) || 0),
+            currentRenderKey: "",
+            websocket: null,
+            reconnectTimer: null,
+            refreshTimer: null,
+            playerTimer: null,
+            objectUrls: []
+        };
+
+        // =========================================================
+        // DOM
+        // =========================================================
+
+        const DOM = Object.freeze({
+            codeScreen: document.getElementById("codeScreen"),
+            slideRoot: document.getElementById("slideRoot"),
+            statusBar: document.getElementById("statusBar"),
+            codeInput: document.getElementById("codeInput"),
+            codeSubmitBtn: document.getElementById("codeSubmitBtn"),
+            codeStatus: document.getElementById("codeStatus"),
+            statusIndicator: document.getElementById("statusIndicator"),
+            statusText: document.getElementById("statusText"),
+            slideCounter: document.getElementById("slideCounter"),
+            screenCodeDisplay: document.getElementById("screenCodeDisplay"),
+            cacheInfo: document.getElementById("cacheInfo")
+        });
+
+        // =========================================================
+        // STARTUP
+        // =========================================================
+
+        init();
+
+        function init() {
+            bindGlobalUiEvents();
+            readCacheIntoState();
+
+            if (state.screenCode) {
+                enterPlayerMode();
+                if (hasDisplayData()) renderCurrentSlide(true);
+                else showLoading("Загрузка расписания", "Получение данных с сервера");
+                startClientRuntime();
+                return;
+            }
+
+            showCodeScreen();
+        }
+
+        function bindGlobalUiEvents() {
+            document.addEventListener("contextmenu", event => event.preventDefault());
+            document.addEventListener("keydown", event => {
+                const key = event.key.toLowerCase();
+                if ((event.ctrlKey && ["r", "w", "u"].includes(key)) || key === "f5") event.preventDefault();
+            });
+            window.addEventListener("resize", scaleCurrentCanvas);
+
+            DOM.codeInput.addEventListener("input", () => {
+                DOM.codeInput.value = DOM.codeInput.value.replace(/\D/g, "").slice(0, 3);
+                if (DOM.codeInput.value.length === 3) window.setTimeout(() => DOM.codeSubmitBtn.click(), 150);
+            });
+            DOM.codeInput.addEventListener("keydown", event => {
+                if (event.key === "Enter") DOM.codeSubmitBtn.click();
+            });
+            DOM.codeSubmitBtn.addEventListener("click", handleActivationSubmit);
+        }
+
+        async function startClientRuntime() {
+            stopTimers();
+            startPlayerLoop();
+            startRefreshLoop();
+
+            const activated = await tryActivateStoredScreen();
+            if (activated) {
+                connectWebSocket();
+                await loadFullSchedule({ silent: hasDisplayData(), reason: "startup" });
+            } else if (hasDisplayData()) {
+                markServerOffline();
+                renderCurrentSlide(true);
+                scheduleWebSocketReconnect();
+            } else {
+                markServerOffline();
+                showEmptyState("Нет данных", "Сервер недоступен, а локальный кэш пуст");
+                scheduleWebSocketReconnect();
+            }
+        }
+
+        function stopTimers() {
+            if (state.playerTimer) window.clearTimeout(state.playerTimer);
+            if (state.refreshTimer) window.clearInterval(state.refreshTimer);
+            state.playerTimer = null;
+            state.refreshTimer = null;
+        }
+
+        function stopConnection() {
+            if (state.reconnectTimer) window.clearTimeout(state.reconnectTimer);
+            state.reconnectTimer = null;
+            if (state.websocket) {
+                try { state.websocket.close(); } catch (_) {}
+            }
+            state.websocket = null;
+        }
+
+        // =========================================================
+        // ACTIVATION
+        // =========================================================
+
+        async function handleActivationSubmit() {
+            const code = DOM.codeInput.value.trim();
+            if (!/^\d{3}$/.test(code)) {
+                setCodeStatus("Введите ровно 3 цифры", "error");
+                return;
+            }
+
+            DOM.codeSubmitBtn.disabled = true;
+            setCodeStatus("Проверка кода...", "");
+
+            try {
+                await activateScreen(code);
+                state.screenCode = code;
+                localStorage.setItem(CONFIG.SCREEN_CODE_KEY, code);
+                resetRuntimeData();
+                setCodeStatus("Экран подключён", "success");
+                window.setTimeout(() => {
+                    enterPlayerMode();
+                    startClientRuntime();
+                }, 250);
+            } catch (error) {
+                setCodeStatus(error.message || "Ошибка активации", "error");
+            } finally {
+                DOM.codeSubmitBtn.disabled = false;
+            }
+        }
+
+        async function tryActivateStoredScreen() {
+            if (!state.screenCode) return false;
+            try {
+                await activateScreen(state.screenCode);
+                return true;
+            } catch (error) {
+                if (error.status === 403 || error.status === 404) {
+                    clearStoredScreenCode();
+                    showCodeScreen();
+                }
+                return false;
+            }
+        }
+
+        async function activateScreen(code) {
+            const response = await requestJson(ENDPOINTS.activate(), {
+                method: "POST",
+                body: JSON.stringify({ code })
+            });
+            syncClockFromPayload(response.data);
+            state.serverOnline = true;
+            updateStatusUi();
+            return response.data;
+        }
+
+        function clearStoredScreenCode() {
+            stopConnection();
+            localStorage.removeItem(CONFIG.SCREEN_CODE_KEY);
+            state.screenCode = "";
+            resetRuntimeData();
+        }
+
+        function resetRuntimeData() {
+            state.schedule = null;
+            state.scheduleVersion = 0;
+            state.scheduleSavedAt = "";
+            state.lastFullSyncAt = "";
+            state.slidesById.clear();
+            state.slidesSavedAt = "";
+            state.currentRenderKey = "";
+            clearImageObjectUrls();
+            updateStatusUi();
+        }
+
+        // =========================================================
+        // CONNECTION / WEBSOCKET
+        // =========================================================
+
+        function connectWebSocket() {
+            if (!state.screenCode) return;
+            if (state.reconnectTimer) {
+                window.clearTimeout(state.reconnectTimer);
+                state.reconnectTimer = null;
+            }
+            if (state.websocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(state.websocket.readyState)) return;
+
+            try {
+                state.websocket = new WebSocket(CONFIG.WS_URL);
+            } catch (_) {
+                markServerOffline();
+                scheduleWebSocketReconnect();
+                return;
+            }
+
+            state.websocket.onopen = () => {
+                state.serverOnline = true;
+                sendWebSocketMessage({
+                    type: "register",
+                    code: state.screenCode,
+                    client_time: new Date().toISOString(),
+                    cached_schedule_version: state.scheduleVersion || 0
+                });
+                updateStatusUi();
+            };
+
+            state.websocket.onmessage = event => handleWebSocketMessage(event.data);
+
+            state.websocket.onclose = () => {
+                markServerOffline();
+                scheduleWebSocketReconnect();
+            };
+
+            state.websocket.onerror = () => {
+                markServerOffline();
+                try { state.websocket.close(); } catch (_) {}
+            };
+        }
+
+        function handleWebSocketMessage(rawData) {
+            let message = null;
+            try { message = JSON.parse(rawData); } catch (_) { return; }
+            const type = String(message.type || "").toLowerCase();
+
+            if (type === "ping") {
+                syncClockFromPayload(message);
+                sendWebSocketMessage({
+                    type: "pong",
+                    code: state.screenCode,
+                    client_time: new Date().toISOString()
+                });
+                return;
+            }
+
+            if (type === "registered") {
+                handleWebSocketRegistered(message);
+                return;
+            }
+
+            if (type === "register_failed") {
+                handleScreenDisabled(message.message || "Регистрация экрана отклонена сервером");
+                return;
+            }
+
+            if (type === "schedule_updated") {
+                handleScheduleUpdatedEvent(message);
+                return;
+            }
+
+            if (type === "slides_updated") {
+                handleSlidesUpdatedEvent(message);
+                return;
+            }
+
+            if (type === "screen_disabled") {
+                handleScreenDisabled(message.message || "Экран отключён администратором");
+            }
+        }
+
+        function handleWebSocketRegistered(message) {
+            syncClockFromPayload(message);
+            state.serverOnline = true;
+            updateStatusUi();
+
+            const serverVersion = safeInteger(message.current_schedule_version, 0);
+            const action = String(message.recommended_action || "").toLowerCase();
+
+            if (action === "full_sync" || !state.schedule || (serverVersion && serverVersion !== state.scheduleVersion)) {
+                loadFullSchedule({ silent: true, reason: "websocket_registered" });
+                return;
+            }
+
+            runMaintenanceSync({ reason: "websocket_registered_maintenance" });
+        }
+
+        function handleScheduleUpdatedEvent(message) {
+            syncClockFromPayload(message);
+            const mode = String(message.mode || "full").toLowerCase();
+
+            if (mode === "patch") {
+                const from = message.from || message.patch_from;
+                const to = message.to || message.patch_to;
+                if (from && to) {
+                    loadSchedulePatch(from, to, {
+                        silent: true,
+                        expectedVersion: safeInteger(message.schedule_version, 0),
+                        previousVersion: safeInteger(message.previous_schedule_version, 0),
+                        reason: message.reason || "schedule_patch"
+                    });
+                    return;
+                }
+            }
+
+            loadFullSchedule({ silent: true, reason: message.reason || "schedule_updated" });
+        }
+
+        function handleSlidesUpdatedEvent(message) {
+            const ids = Array.isArray(message.slide_ids) ? message.slide_ids.map(id => String(id)) : [];
+            const usedIds = new Set(extractSlideIdsFromSchedule(state.schedule));
+            const relevantIds = ids.length > 0 ? ids.filter(id => usedIds.has(String(id))) : [...usedIds];
+            if (relevantIds.length > 0) refreshSlidesByIds(relevantIds, { renderAfter: true });
+        }
+
+        function sendWebSocketMessage(payload) {
+            if (!state.websocket || state.websocket.readyState !== WebSocket.OPEN) return;
+            try { state.websocket.send(JSON.stringify(payload)); } catch (_) {}
+        }
+
+        function markServerOffline() {
+            state.serverOnline = false;
+            updateStatusUi();
+        }
+
+        function scheduleWebSocketReconnect() {
+            if (!state.screenCode || state.reconnectTimer) return;
+            state.reconnectTimer = window.setTimeout(() => {
+                state.reconnectTimer = null;
+                connectWebSocket();
+            }, CONFIG.RECONNECT_DELAY_MS);
+        }
+
+        function handleScreenDisabled(message) {
+            markServerOffline();
+            clearStoredScreenCode();
+            showEmptyState("Экран отключён", message || "Обратитесь к администратору или введите новый код");
+            window.setTimeout(showCodeScreen, 1500);
+        }
+
+        // =========================================================
+        // API CLIENT
+        // =========================================================
+
+        async function requestJson(path, options = {}) {
+            const startedAt = Date.now();
+            const response = await fetch(CONFIG.API_BASE + path, {
+                method: options.method || "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    ...(options.headers || {})
+                },
+                body: options.body,
+                cache: "no-store"
+            });
+            const endedAt = Date.now();
+            syncClockFromResponse(response, startedAt, endedAt);
+
+            let data = null;
+            try { data = await response.json(); } catch (_) {}
+
+            if (!response.ok) {
+                const error = new Error((data && (data.detail || data.message)) || "HTTP " + response.status);
+                error.status = response.status;
+                error.data = data;
+                throw error;
+            }
+
+            state.serverOnline = true;
+            updateStatusUi();
+            return { data, response };
+        }
+
+        function syncClockFromResponse(response, startedAt, endedAt) {
+            const dateHeader = response.headers.get("Date");
+            if (!dateHeader) return;
+            const serverTime = Date.parse(dateHeader);
+            if (Number.isNaN(serverTime)) return;
+            const localMiddle = Math.floor((startedAt + endedAt) / 2);
+            setServerOffset(serverTime - localMiddle);
+        }
+
+        function syncClockFromPayload(payload) {
+            if (!payload || !payload.server_time) return;
+            const serverTime = Date.parse(payload.server_time);
+            if (Number.isNaN(serverTime)) return;
+            setServerOffset(serverTime - Date.now());
+        }
+
+        function setServerOffset(offsetMs) {
+            state.serverOffsetMs = offsetMs;
+            localStorage.setItem(CONFIG.SERVER_OFFSET_KEY, String(offsetMs));
+        }
+
+        function getSyncedNowMs() {
+            return Date.now() + state.serverOffsetMs;
+        }
+
+        // =========================================================
+        // SCHEDULE LOADER
+        // =========================================================
+
+        async function loadFullSchedule(options = {}) {
+            if (!state.screenCode) return;
+            try {
+                const schedule = await fetchFullSchedule();
+                state.lastFullSyncAt = new Date().toISOString();
+                applyFullSchedule(schedule);
+
+                await loadMissingSlidesForSchedule(state.schedule);
+                await persistCurrentSlidesAndImages();
+                updateStatusUi();
+                renderCurrentSlide(true);
+            } catch (error) {
+                markServerOffline();
+                readCacheIntoState();
+                if (hasDisplayData()) renderCurrentSlide(true);
+                else if (!options.silent) showEmptyState("Нет данных", "Сервер недоступен, а локальный кэш пуст");
+            }
+        }
+
+        async function loadSchedulePatch(from, to, options = {}) {
+            if (!state.screenCode) return;
+            if (!state.schedule) {
+                await loadFullSchedule({ silent: options.silent, reason: "patch_without_base" });
+                return;
+            }
+
+            try {
+                const patch = await fetchSchedulePatch(from, to, state.scheduleVersion);
+
+                if (!canApplySchedulePatch(patch, options)) {
+                    await loadFullSchedule({ silent: true, reason: "patch_version_mismatch" });
+                    return;
+                }
+
+                state.schedule = mergeSchedulePatch(state.schedule, patch);
+                state.scheduleVersion = safeInteger(state.schedule.schedule_version, state.scheduleVersion);
+                state.scheduleSavedAt = new Date().toISOString();
+                saveScheduleCache(state.schedule, state.scheduleSavedAt);
+
+                await loadMissingSlidesForSchedule(state.schedule);
+                await persistCurrentSlidesAndImages();
+                updateStatusUi();
+                renderCurrentSlide(true);
+            } catch (error) {
+                markServerOffline();
+            }
+        }
+
+        async function fetchFullSchedule() {
+            const { data } = await requestJson(ENDPOINTS.fullSchedule(state.screenCode));
+            syncClockFromPayload(data);
+            return normalizeSchedule(data, "full");
+        }
+
+        async function fetchSchedulePatch(from, to, baseVersion) {
+            const { data } = await requestJson(ENDPOINTS.patchSchedule(state.screenCode, from, to, baseVersion));
+            syncClockFromPayload(data);
+            return normalizeSchedule(data, "patch");
+        }
+
+        function applyFullSchedule(schedule) {
+            state.schedule = normalizeSchedule(schedule, "full");
+            state.scheduleVersion = safeInteger(state.schedule.schedule_version, 0);
+            state.scheduleSavedAt = new Date().toISOString();
+            saveScheduleCache(state.schedule, state.scheduleSavedAt);
+        }
+
+        function canApplySchedulePatch(patch, options = {}) {
+            const patchVersion = safeInteger(patch.schedule_version, 0);
+            const previousVersion = safeInteger(patch.previous_schedule_version, 0);
+            const expectedVersion = safeInteger(options.expectedVersion, 0);
+            const expectedPrevious = safeInteger(options.previousVersion, 0);
+
+            if (expectedVersion && patchVersion && expectedVersion !== patchVersion) return false;
+            if (expectedPrevious && expectedPrevious !== state.scheduleVersion) return false;
+            if (previousVersion && previousVersion !== state.scheduleVersion) return false;
+            return true;
+        }
+
+        function mergeSchedulePatch(currentSchedule, patch) {
+            const patchFrom = parseDateMs(patch.patch_from || patch.valid_from);
+            const patchTo = parseDateMs(patch.patch_to || patch.valid_to);
+            if (patchFrom === null || patchTo === null || patchTo <= patchFrom) {
+                throw new Error("Некорректный диапазон patch-расписания");
+            }
+
+            const preservedWindows = (currentSchedule.schedule || []).filter(windowItem => {
+                const start = parseDateMs(windowItem.window_start);
+                const end = parseDateMs(windowItem.window_end);
+                if (start === null || end === null) return false;
+                return end <= patchFrom || start >= patchTo;
+            });
+
+            const mergedWindows = preservedWindows
+                .concat(patch.schedule || [])
+                .sort((a, b) => parseDateMs(a.window_start) - parseDateMs(b.window_start));
+
+            return normalizeSchedule({
+                ...currentSchedule,
+                mode: "full",
+                schedule_version: patch.schedule_version || currentSchedule.schedule_version,
+                generated_at: patch.generated_at || currentSchedule.generated_at,
+                server_time: patch.server_time || currentSchedule.server_time,
+                valid_from: currentSchedule.valid_from,
+                valid_to: currentSchedule.valid_to,
+                schedule: mergedWindows
+            }, "full");
+        }
+
+        function normalizeSchedule(payload, fallbackMode = "full") {
+            if (!payload || !Array.isArray(payload.schedule)) throw new Error("Некорректное расписание");
+
+            const windows = payload.schedule
+                .map(windowItem => ({
+                    window_start: windowItem.window_start,
+                    window_end: windowItem.window_end,
+                    slot_duration: Math.max(1, Number(windowItem.slot_duration || 15)),
+                    queue: Array.isArray(windowItem.queue) ? windowItem.queue.map(id => String(id)) : []
+                }))
+                .filter(windowItem => {
+                    return parseDateMs(windowItem.window_start) !== null &&
+                        parseDateMs(windowItem.window_end) !== null &&
+                        windowItem.queue.length > 0;
+                })
+                .sort((a, b) => parseDateMs(a.window_start) - parseDateMs(b.window_start));
+
+            return {
+                mode: String(payload.mode || fallbackMode || "full").toLowerCase(),
+                schedule_version: safeInteger(payload.schedule_version, 0),
+                previous_schedule_version: safeInteger(payload.previous_schedule_version, 0),
+                generated_at: payload.generated_at || "",
+                server_time: payload.server_time || "",
+                valid_from: payload.valid_from || getScheduleValidFrom(windows),
+                valid_to: payload.valid_to || getScheduleValidTo(windows),
+                patch_from: payload.patch_from || payload.from || "",
+                patch_to: payload.patch_to || payload.to || "",
+                window_size_seconds: safeInteger(payload.window_size_seconds, 0),
+                schedule: windows
+            };
+        }
+
+        function extractSlideIdsFromSchedule(schedule) {
+            if (!schedule || !Array.isArray(schedule.schedule)) return [];
+            const ids = new Set();
+            for (const windowItem of schedule.schedule) {
+                for (const id of windowItem.queue || []) ids.add(String(id));
+            }
+            return [...ids];
+        }
+
+        function getScheduleValidFrom(windows) {
+            if (!Array.isArray(windows) || windows.length === 0) return "";
+            return windows[0].window_start || "";
+        }
+
+        function getScheduleValidTo(windows) {
+            if (!Array.isArray(windows) || windows.length === 0) return "";
+            return windows[windows.length - 1].window_end || "";
+        }
+
+        function isFullSyncDue() {
+            if (!state.lastFullSyncAt) return true;
+            const last = parseDateMs(state.lastFullSyncAt);
+            return last === null || Date.now() - last >= CONFIG.DAILY_FULL_SYNC_INTERVAL_MS;
+        }
+
+        function isScheduleEndingSoon() {
+            if (!state.schedule || !state.schedule.valid_to) return true;
+            const validTo = parseDateMs(state.schedule.valid_to);
+            return validTo === null || validTo - getSyncedNowMs() <= CONFIG.FULL_SYNC_EXPIRY_THRESHOLD_MS;
+        }
+
+        async function runMaintenanceSync(options = {}) {
+            if (!state.screenCode || !state.serverOnline) return;
+            if (isFullSyncDue() || isScheduleEndingSoon()) {
+                await loadFullSchedule({ silent: true, reason: options.reason || "maintenance_full_sync" });
+            }
+        }
+
+        // =========================================================
+        // SLIDE LOADER
+        // =========================================================
+
+        async function loadMissingSlidesForSchedule(schedule) {
+            const ids = extractSlideIdsFromSchedule(schedule);
+            const missing = ids.filter(id => !state.slidesById.has(String(id)));
+            if (missing.length > 0) await refreshSlidesByIds(missing, { renderAfter: false, persistAfter: false });
+        }
+
+        async function refreshSlidesByIds(ids, options = {}) {
+            const uniqueIds = [...new Set((ids || []).map(id => String(id)).filter(Boolean))];
+            if (uniqueIds.length === 0) return;
+
+            try {
+                const slides = await fetchSlidesByIds(uniqueIds);
+                mergeSlidesIntoState(slides);
+                if (options.persistAfter !== false) await persistCurrentSlidesAndImages();
+                updateStatusUi();
+                if (options.renderAfter) renderCurrentSlide(true);
+            } catch (error) {
+                markServerOffline();
+            }
+        }
+
+        async function fetchSlidesByIds(ids) {
+            const { data } = await requestJson(ENDPOINTS.slidesBatch(), {
+                method: "POST",
+                body: JSON.stringify({ ids })
+            });
+            const rawSlides = Array.isArray(data) ? data : data && Array.isArray(data.slides) ? data.slides : null;
+            if (!rawSlides) throw new Error("Некорректный список слайдов");
+            return rawSlides.map(normalizeSlide).filter(Boolean);
+        }
+
+        function normalizeSlide(slide) {
+            if (!slide || slide.id === undefined || slide.id === null) return null;
+            return {
+                ...slide,
+                id: String(slide.id),
+                background: normalizeBackground(slide.background),
+                elements: Array.isArray(slide.elements) ? slide.elements.filter(Boolean) : []
+            };
+        }
+
+        function normalizeBackground(background) {
+            if (!background || typeof background !== "object") return { type: "gradient", value: "default" };
+            return {
+                type: String(background.type || "gradient").toLowerCase(),
+                value: background.value || "default"
+            };
+        }
+
+        function mergeSlidesIntoState(slides) {
+            for (const slide of slides) {
+                if (slide && slide.id) state.slidesById.set(String(slide.id), slide);
+            }
+        }
+
+        function isSlideActive(slide, nowMs) {
+            if (!slide || slide.is_active === false) return false;
+            const start = parseDateMs(slide.start_date || slide.startAt || slide.start_at);
+            const end = parseDateMs(slide.end_date || slide.endAt || slide.end_at);
+            if (start !== null && nowMs < start) return false;
+            if (end !== null && nowMs > end) return false;
+            return true;
+        }
+
+        // =========================================================
+        // SCHEDULE CACHE
+        // =========================================================
+
+        function saveScheduleCache(schedule, savedAt) {
+            if (!state.screenCode) return;
+            localStorage.setItem(cacheKey("schedule"), JSON.stringify({
+                savedAt,
+                schedule,
+                scheduleVersion: state.scheduleVersion || safeInteger(schedule && schedule.schedule_version, 0),
+                lastFullSyncAt: state.lastFullSyncAt || ""
+            }));
+        }
+
+        function loadScheduleCache() {
+            try {
+                const raw = localStorage.getItem(cacheKey("schedule"));
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                return {
+                    savedAt: parsed.savedAt || "",
+                    scheduleVersion: safeInteger(parsed.scheduleVersion || (parsed.schedule && parsed.schedule.schedule_version), 0),
+                    lastFullSyncAt: parsed.lastFullSyncAt || "",
+                    schedule: normalizeSchedule(parsed.schedule, "full")
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        // =========================================================
+        // SLIDE CACHE
+        // =========================================================
+
+        function saveSlidesCache(slides, savedAt) {
+            if (!state.screenCode) return;
+            localStorage.setItem(cacheKey("slides"), JSON.stringify({ savedAt, slides }));
+        }
+
+        function loadSlidesCache() {
+            try {
+                const raw = localStorage.getItem(cacheKey("slides"));
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                const slides = Array.isArray(parsed.slides) ? parsed.slides.map(normalizeSlide).filter(Boolean) : [];
+                return { savedAt: parsed.savedAt || "", slides };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function getSlidesForSchedule(schedule) {
+            const ids = new Set(extractSlideIdsFromSchedule(schedule));
+            return [...state.slidesById.values()].filter(slide => ids.has(String(slide.id)));
+        }
+
+        function pruneSlidesNotInSchedule(schedule) {
+            const ids = new Set(extractSlideIdsFromSchedule(schedule));
+            for (const cachedId of [...state.slidesById.keys()]) {
+                if (!ids.has(String(cachedId))) state.slidesById.delete(cachedId);
+            }
+            return getSlidesForSchedule(schedule);
+        }
+
+        async function persistCurrentSlidesAndImages() {
+            const slidesToCache = state.schedule ? pruneSlidesNotInSchedule(state.schedule) : [...state.slidesById.values()];
+            state.slidesSavedAt = new Date().toISOString();
+            saveSlidesCache(slidesToCache, state.slidesSavedAt);
+            await cacheImagesForSlides(slidesToCache);
+            if (state.schedule) await pruneImageCacheForSlides(slidesToCache);
+            return slidesToCache;
+        }
+
+        function readCacheIntoState() {
+            if (!state.screenCode) return;
+
+            const scheduleCache = loadScheduleCache();
+            if (scheduleCache) {
+                state.schedule = scheduleCache.schedule;
+                state.scheduleVersion = scheduleCache.scheduleVersion || safeInteger(scheduleCache.schedule.schedule_version, 0);
+                state.scheduleSavedAt = scheduleCache.savedAt;
+                state.lastFullSyncAt = scheduleCache.lastFullSyncAt || "";
+            }
+
+            const slidesCache = loadSlidesCache();
+            if (slidesCache) {
+                state.slidesById.clear();
+                mergeSlidesIntoState(slidesCache.slides);
+                state.slidesSavedAt = slidesCache.savedAt;
+            }
+
+            updateStatusUi();
+        }
+
+        function cacheKey(kind) {
+            return CONFIG.CACHE_PREFIX + ":" + state.screenCode + ":" + kind;
+        }
+
+        function hasDisplayData() {
+            return Boolean(state.schedule && extractSlideIdsFromSchedule(state.schedule).length > 0 && state.slidesById.size > 0);
+        }
+
+        // =========================================================
+        // IMAGE CACHE
+        // =========================================================
+
+        async function cacheImagesForSlides(slides) {
+            if (!("caches" in window)) return;
+            const urls = collectImageUrlsFromSlides(slides).map(toAbsoluteUrl);
+            if (urls.length === 0) return;
+
+            try {
+                const cache = await caches.open(CONFIG.IMAGE_CACHE_NAME);
+                await Promise.all(urls.map(async url => {
+                    try {
+                        const response = await fetch(url, { cache: "reload" });
+                        if (response.ok) await cache.put(url, response.clone());
+                    } catch (_) {}
+                }));
+            } catch (_) {}
+        }
+
+        function collectImageUrlsFromSlides(slides) {
+            const urls = new Set();
+            for (const slide of slides || []) {
+                if (!slide) continue;
+                if (slide.background && String(slide.background.type).toLowerCase() === "image" && slide.background.value) {
+                    urls.add(String(slide.background.value));
+                }
+                for (const element of slide.elements || []) {
+                    if (String(element.type || "").toLowerCase() === "image") {
+                        const src = getImageElementSource(element);
+                        if (src) urls.add(src);
+                    }
+                }
+            }
+            return [...urls];
+        }
+
+        async function pruneImageCacheForSlides(slides) {
+            if (!("caches" in window)) return;
+
+            const neededUrls = new Set(collectImageUrlsFromSlides(slides).map(toAbsoluteUrl));
+            try {
+                const cache = await caches.open(CONFIG.IMAGE_CACHE_NAME);
+                const requests = await cache.keys();
+                await Promise.all(requests.map(request => {
+                    if (neededUrls.has(request.url)) return Promise.resolve(false);
+                    return cache.delete(request);
+                }));
+            } catch (_) {}
+        }
+
+        async function getCachedImageUrl(src) {
+            if (!("caches" in window) || !src) return "";
+            try {
+                const cache = await caches.open(CONFIG.IMAGE_CACHE_NAME);
+                const response = await cache.match(toAbsoluteUrl(src));
+                if (!response) return "";
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                state.objectUrls.push(objectUrl);
+                return objectUrl;
+            } catch (_) {
+                return "";
+            }
+        }
+
+        async function hydrateRenderedImages(root) {
+            if (!root) root = DOM.slideRoot;
+            const images = [...root.querySelectorAll("img[data-cache-src]")];
+            for (const img of images) {
+                const cacheSrc = img.dataset.cacheSrc;
+                img.onerror = async () => {
+                    const cachedUrl = await getCachedImageUrl(cacheSrc);
+                    if (cachedUrl && img.src !== cachedUrl) img.src = cachedUrl;
+                };
+                if (!state.serverOnline) {
+                    const cachedUrl = await getCachedImageUrl(cacheSrc);
+                    if (cachedUrl) img.src = cachedUrl;
+                }
+            }
+
+            const backgrounds = [...root.querySelectorAll("[data-bg-cache-src]")];
+            for (const node of backgrounds) {
+                if (state.serverOnline) continue;
+                const cachedUrl = await getCachedImageUrl(node.dataset.bgCacheSrc);
+                if (cachedUrl) node.style.backgroundImage = "url(" + JSON.stringify(cachedUrl) + ")";
+            }
+        }
+
+        function clearImageObjectUrls() {
+            for (const objectUrl of state.objectUrls) URL.revokeObjectURL(objectUrl);
+            state.objectUrls = [];
+        }
+
+        // =========================================================
+        // PLAYER
+        // =========================================================
+
+        function startPlayerLoop() {
+            if (state.playerTimer) window.clearTimeout(state.playerTimer);
+            renderCurrentSlide(false);
+            const delay = getDelayToNextPlayerTick();
+            state.playerTimer = window.setTimeout(startPlayerLoop, delay);
+        }
+
+        function startRefreshLoop() {
+            if (state.refreshTimer) window.clearInterval(state.refreshTimer);
+            state.refreshTimer = window.setInterval(() => {
+                runMaintenanceSync({ reason: "periodic_maintenance" });
+            }, CONFIG.REFRESH_INTERVAL_MS);
+        }
+
+        function getDelayToNextPlayerTick() {
+            const selection = selectCurrentScheduleSlot();
+            if (!selection || !selection.windowStartMs) return CONFIG.PLAYER_FALLBACK_DELAY_MS;
+            const nextSlotMs = selection.windowStartMs + ((selection.slotIndex + 1) * selection.slotDurationMs);
+            const delay = nextSlotMs - getSyncedNowMs() + 25;
+            return Math.max(CONFIG.PLAYER_MIN_DELAY_MS, Math.min(delay, CONFIG.REFRESH_INTERVAL_MS));
+        }
+
+        function renderCurrentSlide(force) {
+            if (!state.schedule) {
+                showEmptyState("Нет расписания", "Экран ждёт данные от сервера");
+                DOM.slideCounter.textContent = "0 / 0";
+                return;
+            }
+
+            const selection = selectCurrentScheduleSlot();
+            if (!selection) {
+                state.currentRenderKey = "";
+                showEmptyState("Нет текущего окна", "В расписании нет окна для текущего времени");
+                DOM.slideCounter.textContent = "0 / 0";
+                return;
+            }
+
+            const slide = state.slidesById.get(selection.slideId);
+            if (!slide) {
+                state.currentRenderKey = "";
+                if (state.serverOnline) refreshSlidesByIds([selection.slideId], { renderAfter: true });
+                showEmptyState("Слайд не загружен", "Ожидание данных по slide_id: " + selection.slideId);
+                DOM.slideCounter.textContent = (selection.queueIndex + 1) + " / " + selection.queueLength;
+                return;
+            }
+
+            const renderKey = selection.slideId + ":" + selection.windowStartMs + ":" + selection.slotIndex;
+            DOM.slideCounter.textContent = (selection.queueIndex + 1) + " / " + selection.queueLength;
+            if (!force && state.currentRenderKey === renderKey) return;
+            state.currentRenderKey = renderKey;
+
+            clearImageObjectUrls();
+            renderSlide(slide);
+            updateStatusUi();
+        }
+
+        function selectCurrentScheduleSlot() {
+            const nowMs = getSyncedNowMs();
+            const windowItem = findCurrentScheduleWindow(nowMs);
+            if (!windowItem) return null;
+
+            const queue = windowItem.queue || [];
+            if (queue.length === 0) return null;
+
+            const windowStartMs = parseDateMs(windowItem.window_start);
+            const slotDurationMs = Math.max(1, Number(windowItem.slot_duration || 15)) * 1000;
+            const slotIndex = Math.floor((nowMs - windowStartMs) / slotDurationMs);
+            const baseQueueIndex = positiveModulo(slotIndex, queue.length);
+
+            for (let offset = 0; offset < queue.length; offset += 1) {
+                const queueIndex = (baseQueueIndex + offset) % queue.length;
+                const slideId = String(queue[queueIndex]);
+                const slide = state.slidesById.get(slideId);
+                if (!slide || isSlideActive(slide, nowMs)) {
+                    return {
+                        slideId,
+                        slotIndex,
+                        queueIndex,
+                        queueLength: queue.length,
+                        windowStartMs,
+                        slotDurationMs
+                    };
+                }
+            }
+
+            return null;
+        }
+
+        function findCurrentScheduleWindow(nowMs) {
+            if (!state.schedule || !Array.isArray(state.schedule.schedule)) return null;
+            return state.schedule.schedule.find(windowItem => {
+                const start = parseDateMs(windowItem.window_start);
+                const end = parseDateMs(windowItem.window_end);
+                return start !== null && end !== null && nowMs >= start && nowMs < end;
+            }) || null;
+        }
+
+        // =========================================================
+        // RENDER
+        // =========================================================
+
+        function renderSlide(slide) {
+            const canvas = document.createElement("section");
+            canvas.className = "slide-canvas";
+            canvas.setAttribute("aria-label", "Слайд " + slide.id);
+            applySlideBackground(canvas, slide.background);
+
+            for (const element of slide.elements || []) {
+                const node = renderElement(element);
+                if (node) canvas.appendChild(node);
+            }
+
+            DOM.slideRoot.innerHTML = "";
+            DOM.slideRoot.appendChild(canvas);
+            scaleCurrentCanvas();
+            hydrateRenderedImages(canvas);
+        }
+
+        function renderElement(element) {
+            const type = String(element.type || "text").toLowerCase();
+            if (type === "text") return renderTextElement(element);
+            if (type === "image") return renderImageElement(element);
+            if (type === "chart" || type === "metric") return renderMetricElement(element);
+            if (type === "badge") return renderBadgeElement(element);
+            return renderTextElement({ ...element, value: element.value ?? "" });
+        }
+
+        function renderTextElement(element) {
+            const node = document.createElement("div");
+            node.className = "slide-element slide-text";
+            applyRoleClass(node, element.role);
+            applyTextAlignmentClasses(node, element.layout || {});
+            node.textContent = String(element.value ?? element.text ?? "");
+            applyLayout(node, element.layout, {
+                width: 1200,
+                height: 140,
+                fontSize: 64,
+                color: "#ffffff",
+                fontWeight: 700
+            });
+            return node;
+        }
+
+        function renderImageElement(element) {
+            const node = document.createElement("div");
+            node.className = "slide-element slide-image-element";
+            applyImageClasses(node, element.layout || {}, element.role);
+            applyLayout(node, element.layout, { width: 800, height: 500 });
+
+            const src = getImageElementSource(element);
+            if (src) {
+                const img = document.createElement("img");
+                img.src = src;
+                img.dataset.cacheSrc = toAbsoluteUrl(src);
+                img.alt = String(element.alt || element.title || element.role || "Изображение");
+                node.appendChild(img);
+            }
+            return node;
+        }
+
+        function renderMetricElement(element) {
+            const chart = element.chart || element.metric || {};
+            const chartType = String(chart.chartType || chart.type || "value").toLowerCase();
+
+            if (chartType === "value" || (!chart.datasets && element.value !== undefined)) {
+                return renderMetricValueElement(element);
+            }
+
+            const node = document.createElement("div");
+            node.className = "slide-element slide-chart";
+            applyRoleClass(node, element.role);
+            applyLayout(node, element.layout, { width: 1200, height: 520 });
+
+            const canvas = document.createElement("canvas");
+            node.appendChild(canvas);
+            window.requestAnimationFrame(() => drawChart(canvas, chart));
+            return node;
+        }
+
+        function renderMetricValueElement(element) {
+            const node = document.createElement("div");
+            node.className = "slide-element metric-value";
+            applyRoleClass(node, element.role);
+            const chart = element.chart || element.metric || {};
+            const value = element.value ?? chart.value ?? "—";
+            const unit = chart.unit ? " " + chart.unit : "";
+            node.textContent = String(value) + unit;
+            applyLayout(node, element.layout, {
+                width: 900,
+                height: 220,
+                fontSize: 150,
+                color: "#d6ffe8",
+                fontWeight: 800
+            });
+            return node;
+        }
+
+        function renderBadgeElement(element) {
+            const node = document.createElement("div");
+            node.className = "slide-element slide-badge";
+            applyRoleClass(node, element.role);
+            node.textContent = String(element.value ?? element.text ?? "");
+            applyLayout(node, element.layout, {
+                width: 360,
+                height: 70,
+                fontSize: 30,
+                color: "#ffffff",
+                fontWeight: 700
+            });
+            return node;
+        }
+
+        function applySlideBackground(canvas, background) {
+            canvas.classList.add("bg-default");
+            if (!background) return;
+
+            const type = String(background.type || "gradient").toLowerCase();
+            const value = String(background.value || "default");
+
+            if (type === "color" && isSafeCssColor(value)) {
+                canvas.classList.remove("bg-default");
+                canvas.style.background = value;
+                return;
+            }
+
+            if (type === "image" && value) {
+                canvas.classList.remove("bg-default");
+                canvas.classList.add("bg-image");
+                canvas.style.backgroundImage = "url(" + JSON.stringify(toAbsoluteUrl(value)) + ")";
+                canvas.style.backgroundSize = "cover";
+                canvas.style.backgroundPosition = "center";
+                canvas.dataset.bgCacheSrc = toAbsoluteUrl(value);
+                return;
+            }
+
+            if (type === "gradient") {
+                const preset = sanitizeClassName(value);
+                const knownPreset = ["default", "announcement", "urgent", "image", "greeting", "metric", "light"].includes(preset) ? preset : "default";
+                canvas.classList.remove("bg-default");
+                canvas.classList.add("bg-" + knownPreset);
+            }
+        }
+
+        function applyLayout(node, layout = {}, defaults = {}) {
+            const x = safeNumber(layout.x, defaults.x || 0);
+            const y = safeNumber(layout.y, defaults.y || 0);
+            const width = safeNumber(layout.width, defaults.width || 400);
+            const height = safeNumber(layout.height, defaults.height || 100);
+
+            node.style.left = x + "px";
+            node.style.top = y + "px";
+            node.style.width = width + "px";
+            node.style.height = height + "px";
+            node.style.zIndex = String(safeInteger(layout.zIndex, defaults.zIndex || 1));
+
+            if (layout.fontSize !== undefined || defaults.fontSize !== undefined) node.style.fontSize = safeNumber(layout.fontSize, defaults.fontSize) + "px";
+            if (layout.fontWeight !== undefined || defaults.fontWeight !== undefined) node.style.fontWeight = String(layout.fontWeight || defaults.fontWeight);
+            if (layout.color !== undefined || defaults.color !== undefined) node.style.color = isSafeCssColor(layout.color) ? layout.color : defaults.color;
+            if (layout.backgroundColor && isSafeCssColor(layout.backgroundColor)) node.style.backgroundColor = layout.backgroundColor;
+            if (layout.borderColor && isSafeCssColor(layout.borderColor)) node.style.borderColor = layout.borderColor;
+            if (layout.borderRadius !== undefined) node.style.borderRadius = safeNumber(layout.borderRadius, 0) + "px";
+            if (layout.opacity !== undefined) node.style.opacity = String(Math.max(0, Math.min(1, safeNumber(layout.opacity, 1))));
+            if (layout.lineHeight !== undefined) node.style.lineHeight = String(layout.lineHeight);
+            if (layout.padding !== undefined) node.style.padding = safeNumber(layout.padding, 0) + "px";
+        }
+
+        function applyTextAlignmentClasses(node, layout) {
+            const align = String(layout.textAlign || "center").toLowerCase();
+            const valign = String(layout.verticalAlign || "middle").toLowerCase();
+            node.classList.add(["left", "center", "right"].includes(align) ? "align-" + align : "align-center");
+            node.classList.add(["top", "middle", "bottom"].includes(valign) ? "valign-" + valign : "valign-middle");
+        }
+
+        function applyImageClasses(node, layout, role) {
+            const fit = String(layout.fit || "contain").toLowerCase();
+            const shape = String(layout.shape || "").toLowerCase();
+            if (["cover", "fill"].includes(fit)) node.classList.add("fit-" + fit);
+            if (["rounded", "circle"].includes(shape)) node.classList.add("shape-" + shape);
+            if (role === "photo" || role === "person_photo") node.classList.add("shape-circle", "shadow-soft");
+            if (layout.shadow) node.classList.add("shadow-soft");
+        }
+
+        function applyRoleClass(node, role) {
+            if (!role) return;
+            const roleClass = sanitizeClassName(String(role));
+            if (roleClass) node.classList.add("role-" + roleClass);
+        }
+
+        function getImageElementSource(element) {
+            return String(element.src || element.url || element.value || (element.image && element.image.src) || "");
+        }
+
+        function scaleCurrentCanvas() {
+            const canvas = DOM.slideRoot.querySelector(".slide-canvas");
+            if (!canvas) return;
+            const rootWidth = DOM.slideRoot.clientWidth || window.innerWidth;
+            const rootHeight = DOM.slideRoot.clientHeight || window.innerHeight;
+            const scale = Math.min(rootWidth / CONFIG.CANVAS_WIDTH, rootHeight / CONFIG.CANVAS_HEIGHT);
+            const left = Math.round((rootWidth - CONFIG.CANVAS_WIDTH * scale) / 2);
+            const top = Math.round((rootHeight - CONFIG.CANVAS_HEIGHT * scale) / 2);
+            canvas.style.left = left + "px";
+            canvas.style.top = top + "px";
+            canvas.style.transform = "scale(" + scale + ")";
+        }
+
+        function drawChart(canvas, chart) {
+            if (!canvas || !chart) return;
+            const width = canvas.clientWidth || (canvas.parentElement && canvas.parentElement.clientWidth) || 1;
+            const height = canvas.clientHeight || (canvas.parentElement && canvas.parentElement.clientHeight) || 1;
+            const scale = window.devicePixelRatio || 1;
+            canvas.width = Math.max(1, Math.floor(width * scale));
+            canvas.height = Math.max(1, Math.floor(height * scale));
+
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            ctx.scale(scale, scale);
+            const labels = Array.isArray(chart.labels) ? chart.labels : [];
+            const dataset = Array.isArray(chart.datasets) && chart.datasets.length > 0 ? chart.datasets[0] : null;
+            const data = dataset && Array.isArray(dataset.data) ? dataset.data.map(Number).filter(value => !Number.isNaN(value)) : [];
+            const type = String(chart.chartType || chart.type || "bar").toLowerCase();
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = "rgba(255,255,255,0.88)";
+            ctx.strokeStyle = "rgba(255,255,255,0.72)";
+            ctx.lineWidth = 3;
+            ctx.font = "24px Segoe UI, sans-serif";
+
+            if (data.length === 0) {
+                ctx.fillText("Нет данных", 24, 42);
+                return;
+            }
+
+            const padding = { left: 70, right: 32, top: 42, bottom: 74 };
+            const chartWidth = Math.max(1, width - padding.left - padding.right);
+            const chartHeight = Math.max(1, height - padding.top - padding.bottom);
+            const max = Math.max(...data, 1);
+            const min = Math.min(...data, 0);
+            const range = Math.max(1, max - Math.min(0, min));
+            const baseY = padding.top + chartHeight;
+
+            ctx.strokeStyle = "rgba(255,255,255,0.25)";
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, baseY);
+            ctx.lineTo(width - padding.right, baseY);
+            ctx.stroke();
+
+            if (type === "line") drawLineChart(ctx, data, labels, padding, chartWidth, chartHeight, range, min, baseY);
+            else drawBarChart(ctx, data, labels, padding, chartWidth, chartHeight, max, baseY);
+        }
+
+        function drawBarChart(ctx, data, labels, padding, chartWidth, chartHeight, max, baseY) {
+            const gap = 18;
+            const barWidth = Math.max(12, (chartWidth - gap * (data.length - 1)) / data.length);
+            ctx.fillStyle = "rgba(255,255,255,0.78)";
+            ctx.textAlign = "center";
+
+            data.forEach((value, index) => {
+                const x = padding.left + index * (barWidth + gap);
+                const h = Math.max(2, (value / max) * chartHeight);
+                const y = baseY - h;
+                roundRect(ctx, x, y, barWidth, h, 10);
+                ctx.fill();
+                ctx.fillText(String(labels[index] || ""), x + barWidth / 2, baseY + 36);
+                ctx.fillText(String(value), x + barWidth / 2, y - 12);
+            });
+        }
+
+        function drawLineChart(ctx, data, labels, padding, chartWidth, chartHeight, range, min, baseY) {
+            const step = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
+            const points = data.map((value, index) => ({
+                x: padding.left + index * step,
+                y: baseY - ((value - Math.min(0, min)) / range) * chartHeight,
+                value
+            }));
+
+            ctx.strokeStyle = "rgba(255,255,255,0.78)";
+            ctx.beginPath();
+            points.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+
+            ctx.fillStyle = "rgba(255,255,255,0.88)";
+            ctx.textAlign = "center";
+            points.forEach((point, index) => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillText(String(labels[index] || ""), point.x, baseY + 36);
+                ctx.fillText(String(point.value), point.x, point.y - 14);
+            });
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            const r = Math.min(radius, width / 2, height / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + width, y, x + width, y + height, r);
+            ctx.arcTo(x + width, y + height, x, y + height, r);
+            ctx.arcTo(x, y + height, x, y, r);
+            ctx.arcTo(x, y, x + width, y, r);
+            ctx.closePath();
+        }
+
+        // =========================================================
+        // STATUS UI
+        // =========================================================
+
+        function enterPlayerMode() {
+            DOM.codeScreen.classList.add("hidden");
+            DOM.slideRoot.classList.remove("hidden");
+            DOM.statusBar.classList.remove("hidden");
+            DOM.screenCodeDisplay.textContent = "Экран: " + state.screenCode;
+            updateStatusUi();
+        }
+
+        function showCodeScreen() {
+            stopTimers();
+            stopConnection();
+            DOM.codeScreen.classList.remove("hidden");
+            DOM.slideRoot.classList.add("hidden");
+            DOM.statusBar.classList.add("hidden");
+            DOM.codeInput.value = "";
+            DOM.codeInput.focus();
+        }
+
+        function updateStatusUi() {
+            DOM.statusIndicator.className = "";
+
+            if (state.serverOnline) {
+                DOM.statusText.textContent = "Онлайн";
+            } else if (hasDisplayData()) {
+                DOM.statusIndicator.className = "cached";
+                DOM.statusText.textContent = "Автономно: кэш";
+            } else {
+                DOM.statusIndicator.className = "offline";
+                DOM.statusText.textContent = "Офлайн";
+            }
+
+            const scheduleTime = state.scheduleSavedAt ? formatTime(state.scheduleSavedAt) : "пусто";
+            const slideCount = state.slidesById.size;
+            const versionText = state.scheduleVersion ? ", v" + state.scheduleVersion : "";
+            DOM.cacheInfo.textContent = "Кэш: " + scheduleTime + versionText + ", слайдов: " + slideCount;
+        }
+
+        function showLoading(title, text) {
+            DOM.slideRoot.innerHTML = "";
+            const node = document.createElement("div");
+            node.className = "loading-state";
+            node.innerHTML = "<h1></h1><p></p>";
+            node.querySelector("h1").textContent = title;
+            node.querySelector("p").textContent = text;
+            DOM.slideRoot.appendChild(node);
+        }
+
+        function showEmptyState(title, text) {
+            DOM.slideRoot.innerHTML = "";
+            const node = document.createElement("div");
+            node.className = "empty-state";
+            node.innerHTML = "<h1></h1><p></p>";
+            node.querySelector("h1").textContent = title;
+            node.querySelector("p").textContent = text;
+            DOM.slideRoot.appendChild(node);
+            updateStatusUi();
+        }
+
+        function setCodeStatus(text, className) {
+            DOM.codeStatus.textContent = text;
+            DOM.codeStatus.className = className || "";
+        }
+
+        // =========================================================
+        // UTILS
+        // =========================================================
+
+        function parseDateMs(value) {
+            if (!value) return null;
+            const ms = Date.parse(value);
+            return Number.isNaN(ms) ? null : ms;
+        }
+
+        function positiveModulo(value, divisor) {
+            return ((value % divisor) + divisor) % divisor;
+        }
+
+        function safeNumber(value, fallback) {
+            const number = Number(value);
+            return Number.isFinite(number) ? number : Number(fallback || 0);
+        }
+
+        function safeInteger(value, fallback) {
+            const number = parseInt(value, 10);
+            return Number.isFinite(number) ? number : Number(fallback || 0);
+        }
+
+        function sanitizeClassName(value) {
+            return String(value || "")
+                .toLowerCase()
+                .replace(/[^a-zа-яё0-9_-]+/gi, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 48);
+        }
+
+        function isSafeCssColor(value) {
+            if (typeof value !== "string") return false;
+            return /^#[0-9a-f]{3,8}$/i.test(value) ||
+                /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*(0|1|0?\.\d+))?\s*\)$/i.test(value) ||
+                /^[a-z]+$/i.test(value);
+        }
+
+        function toAbsoluteUrl(url) {
+            try { return new URL(url, window.location.origin).href; }
+            catch (_) { return String(url || ""); }
+        }
+
+        function formatTime(value) {
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return "—";
+            return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+        }
+    </script>
+</body>
+</html>
