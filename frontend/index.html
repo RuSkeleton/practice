@@ -624,15 +624,27 @@
             try {
                 websocket = new WebSocket(WS_URL);
                 websocket.onopen = () => {
-                    if (screenCode) websocket.send(JSON.stringify({ type: "register", code: screenCode }));
+                    isOnline = true;
+                    updateStatus();
+
+                    if (screenCode) {
+                        websocket.send(JSON.stringify({ type: "register", code: screenCode }));
+                    }
+
+                    refreshSlides({ silent: true });
                 };
                 websocket.onmessage = event => {
                     let message = null;
                     try { message = JSON.parse(event.data); } catch (_) {}
                     if (!message || shouldReloadSlides(message)) refreshSlides({ silent: true });
                 };
-                websocket.onclose = scheduleWebSocketReconnect;
+                websocket.onclose = () => {
+                    markServerOffline();
+                    scheduleWebSocketReconnect();
+                };
+
                 websocket.onerror = () => {
+                    markServerOffline();
                     try { websocket.close(); } catch (_) {}
                     scheduleWebSocketReconnect();
                 };
@@ -644,6 +656,18 @@
         function shouldReloadSlides(message) {
             const type = String(message.type || "").toLowerCase();
             return type.includes("slide") || type.includes("update") || type.includes("content") || type === "";
+        }
+
+        function markServerOffline() {
+            isOnline = false;
+
+            if (allSlides.length > 0 || loadCachedSlides().length > 0) {
+                usingCache = true;
+            } else {
+                usingCache = false;
+            }
+
+            updateStatus();
         }
 
         function scheduleWebSocketReconnect() {
