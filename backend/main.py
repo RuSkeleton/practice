@@ -73,6 +73,10 @@ def root():
 async def startup_event():
     print(" Digital Signage API started")
 
+@app.get("/editor.html")
+def editor_page():
+    return FileResponse(FRONTEND_DIR / "editor.html")
+
 if __name__ == "__main__":
     import uvicorn
 
