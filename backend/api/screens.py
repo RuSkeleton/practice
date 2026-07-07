@@ -6,7 +6,7 @@ import random
 from datetime import datetime
 from backend import models, schemas
 from backend.database import get_db
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_hr_or_admin
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ router = APIRouter()
 def create_screen(
     screen: schemas.ScreenCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_hr_or_admin)
 ):
     existing = db.query(models.Screen).filter(models.Screen.code == screen.code).first()
     if existing:
@@ -41,7 +41,7 @@ def update_screen(
     screen_id: int,
     screen_data: schemas.ScreenUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_hr_or_admin)
 ):
     screen = db.query(models.Screen).filter(models.Screen.id == screen_id).first()
     if not screen:
@@ -53,7 +53,7 @@ def update_screen(
     return screen
 
 @router.delete("/screens/{screen_id}")
-def delete_screen(screen_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_screen(screen_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(require_hr_or_admin)):
     screen = db.query(models.Screen).filter(models.Screen.id == screen_id).first()
     if not screen:
         raise HTTPException(status_code=404, detail="Screen not found")
@@ -62,7 +62,7 @@ def delete_screen(screen_id: int, db: Session = Depends(get_db), current_user: m
     return {"ok": True}
 
 @router.post("/screens/{screen_id}/connect")
-def connect_screen(screen_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def connect_screen(screen_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(require_hr_or_admin)):
     screen = db.query(models.Screen).filter(models.Screen.id == screen_id).first()
     if not screen:
         raise HTTPException(status_code=404, detail="Screen not found")
@@ -71,7 +71,7 @@ def connect_screen(screen_id: int, db: Session = Depends(get_db), current_user: 
     return {"ok": True, "message": f"Screen {screen.code} connected"}
 
 @router.post("/screens/{screen_id}/disconnect")
-def disconnect_screen(screen_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def disconnect_screen(screen_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(require_hr_or_admin)):
     screen = db.query(models.Screen).filter(models.Screen.id == screen_id).first()
     if not screen:
         raise HTTPException(status_code=404, detail="Screen not found")

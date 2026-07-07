@@ -18,8 +18,13 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), default="hr")
+    role = Column(String(20), default="hr")          # hr, admin, viewer
+    full_name = Column(String(100), nullable=True)   # ФИО
+    email = Column(String(100), unique=True, nullable=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    last_login = Column(DateTime, nullable=True)
 
 class Slide(Base):
     __tablename__ = "slides"

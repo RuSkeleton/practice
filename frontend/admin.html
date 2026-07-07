@@ -273,6 +273,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="slides">Слайды</button>
             <button class="tab" data-tab="screens">Экраны</button>
+            <button class="tab" data-tab="users">Пользователи</button>
         </div>
 
         <div id="tabSlides" class="tab-content active">
@@ -369,6 +370,50 @@
         </div>
     </div>
 
+    <div id="tabUsers" class="tab-content">
+    <div class="card">
+        <h2>Управление пользователями</h2>
+        <form id="userForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Логин *</label>
+                    <input id="userUsername" required />
+                </div>
+                <div class="form-group">
+                    <label>Пароль *</label>
+                    <input id="userPassword" type="password" required />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ФИО</label>
+                    <input id="userFullName" />
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input id="userEmail" type="email" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Роль</label>
+                <select id="userRole">
+                    <option value="hr">HR</option>
+                    <option value="admin">Администратор</option>
+                    <option value="viewer">Наблюдатель</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary" id="userSubmitBtn">Создать</button>
+            <button type="button" class="btn-secondary" id="userCancelBtn" style="display:none;">Отмена</button>
+        </form>
+        <div id="userFormMessage" class="form-message"></div>
+    </div>
+
+    <div class="card">
+        <h2>Список пользователей</h2>
+        <div id="usersList"><p class="loading">Загрузка...</p></div>
+    </div>
+</div>
+
     <script>
         const API_BASE = window.location.origin + '/api';
         let token = localStorage.getItem('token');
@@ -389,6 +434,9 @@
                 if (target) target.classList.add('active');
                 if (this.dataset.tab === 'screens') {
                     loadScreens();
+                }
+                if (this.dataset.tab === 'users') {
+                    loadUsers();
                 }
             });
         });
@@ -626,9 +674,151 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadSlides();
             loadScreens();
+            loadUsers();
         });
 
         setInterval(loadSlides, 5000);
+
+        // ========== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ==========
+let editingUserId = null;
+
+async function loadUsers() {
+    try {
+        const response = await fetch(API_BASE + '/users', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok) {
+            const users = await response.json();
+            renderUsers(users);
+        } else if (response.status === 403) {
+            document.getElementById('usersList').innerHTML =
+                '<div class="empty-state">Доступ запрещён (требуется администратор)</div>';
+        } else {
+            document.getElementById('usersList').innerHTML =
+                '<div class="empty-state">Ошибка загрузки пользователей</div>';
+        }
+    } catch {
+        document.getElementById('usersList').innerHTML =
+            '<div class="empty-state">Ошибка подключения к серверу</div>';
+    }
+}
+
+function renderUsers(users) {
+    const container = document.getElementById('usersList');
+    if (!users || !users.length) {
+        container.innerHTML = '<div class="empty-state">Нет пользователей</div>';
+        return;
+    }
+    container.innerHTML = users.map(u => `
+        <div class="slide-item" style="border-left-color: ${u.is_active ? '#27ae60' : '#6a7a9a'};">
+            <div class="slide-info">
+                <div><strong>${u.username}</strong> (${u.full_name || '—'})</div>
+                <div style="font-size:12px;color:#6a7a9a;">
+                    ${u.email || 'Нет email'} • Роль: ${u.role}
+                    ${u.is_active ? 'Активен' : 'Неактивен'}
+                </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-secondary" onclick="editUser(${u.id})">✎</button>
+                <button class="delete-btn" onclick="deleteUser(${u.id})">Удалить</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function deleteUser(id) {
+    if (!confirm('Удалить пользователя?')) return;
+    try {
+        const response = await fetch(API_BASE + '/users/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok) {
+            loadUsers();
+        } else {
+            alert('Ошибка при удалении');
+        }
+    } catch {
+        alert('Ошибка подключения');
+    }
+}
+
+function editUser(id) {
+    fetch(API_BASE + '/users/' + id, {
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Ошибка загрузки');
+        return res.json();
+    })
+    .then(user => {
+        editingUserId = id;
+        document.getElementById('userUsername').value = user.username;
+        document.getElementById('userFullName').value = user.full_name || '';
+        document.getElementById('userEmail').value = user.email || '';
+        document.getElementById('userRole').value = user.role || 'hr';
+        document.getElementById('userPassword').placeholder = 'Оставьте пустым, чтобы не менять';
+        document.getElementById('userPassword').required = false;
+        document.getElementById('userSubmitBtn').textContent = 'Сохранить';
+        document.getElementById('userCancelBtn').style.display = 'inline-block';
+        document.getElementById('userFormMessage').textContent = '';
+        document.getElementById('userFormMessage').className = 'form-message';
+    })
+    .catch(() => {
+        alert('Не удалось загрузить данные пользователя');
+    });
+}
+
+function resetUserForm() {
+    editingUserId = null;
+    document.getElementById('userForm').reset();
+    document.getElementById('userPassword').required = true;
+    document.getElementById('userPassword').placeholder = '';
+    document.getElementById('userSubmitBtn').textContent = 'Создать';
+    document.getElementById('userCancelBtn').style.display = 'none';
+    document.getElementById('userFormMessage').textContent = '';
+    document.getElementById('userFormMessage').className = 'form-message';
+}
+
+document.getElementById('userCancelBtn').addEventListener('click', resetUserForm);
+
+document.getElementById('userForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const data = {
+        username: document.getElementById('userUsername').value,
+        full_name: document.getElementById('userFullName').value || null,
+        email: document.getElementById('userEmail').value || null,
+        role: document.getElementById('userRole').value,
+        password: document.getElementById('userPassword').value
+    };
+    const url = editingUserId ? API_BASE + '/users/' + editingUserId : API_BASE + '/users';
+    const method = editingUserId ? 'PUT' : 'POST';
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(data)
+        });
+        const msg = document.getElementById('userFormMessage');
+        if (response.ok) {
+            msg.textContent = editingUserId ? 'Пользователь обновлён' : 'Пользователь создан';
+            msg.className = 'form-message success';
+            resetUserForm();
+            loadUsers();
+        } else {
+            const err = await response.json();
+            msg.textContent = 'Ошибка: ' + (err.detail || 'Неизвестная ошибка');
+            msg.className = 'form-message error';
+        }
+    } catch {
+        document.getElementById('userFormMessage').textContent = 'Ошибка подключения к серверу';
+        document.getElementById('userFormMessage').className = 'form-message error';
+    }
+});
+
     </script>
 </body>
 </html>
