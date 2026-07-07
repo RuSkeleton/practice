@@ -49,6 +49,10 @@ def list_users(
 ):
     return get_users(db, skip=skip, limit=limit)
 
+@router.get("/users/me", response_model=UserOut)
+def get_current_user_info(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
 @router.get("/users/{user_id}", response_model=UserOut)
 def get_user_by_id(
     user_id: int,
