@@ -418,6 +418,7 @@
         const API_BASE = window.location.origin + '/api';
         let token = localStorage.getItem('token');
         if (!token) { window.location.href = 'main.html'; }
+        let currentUserRole = '';
 
         document.getElementById('logoutBtn').addEventListener('click', function() {
             localStorage.removeItem('token');
@@ -672,9 +673,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            loadSlides();
-            loadScreens();
-            loadUsers();
+            // Загружаем профиль пользователя, а уже внутри applyRoleRestrictions будем вызывать загрузку данных
+            loadUserProfile();
         });
 
         setInterval(loadSlides, 5000);
@@ -818,6 +818,79 @@ document.getElementById('userForm').addEventListener('submit', async function(e)
         document.getElementById('userFormMessage').className = 'form-message error';
     }
 });
+async function loadUserProfile() {
+    try {
+        const response = await fetch(API_BASE + '/users/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok) {
+            const user = await response.json();
+            currentUserRole = user.role || 'viewer';
+            applyRoleRestrictions();
+        } else {
+            console.error('Ошибка получения профиля, статус:', response.status);
+            document.querySelector('.container').innerHTML = '<div class="empty-state">Ошибка загрузки профиля. Проверьте права доступа.</div>';
+        }
+    } catch (error) {
+        console.error('Ошибка сети:', error);
+        document.querySelector('.container').innerHTML = '<div class="empty-state">Ошибка сети. Проверьте подключение к серверу.</div>';
+    }
+}
+
+function applyRoleRestrictions() {
+    // Скрываем или показываем вкладки и контент в зависимости от роли
+    const role = currentUserRole;
+    const tabSlides = document.querySelector('[data-tab="slides"]');
+    const tabScreens = document.querySelector('[data-tab="screens"]');
+    const tabUsers = document.querySelector('[data-tab="users"]');
+    const contentSlides = document.getElementById('tabSlides');
+    const contentScreens = document.getElementById('tabScreens');
+    const contentUsers = document.getElementById('tabUsers');
+
+    // Для администратора – всё видно
+    if (role === 'admin') {
+        if (tabSlides) tabSlides.style.display = '';
+        if (tabScreens) tabScreens.style.display = '';
+        if (tabUsers) tabUsers.style.display = '';
+        if (contentSlides) contentSlides.style.display = '';
+        if (contentScreens) contentScreens.style.display = '';
+        if (contentUsers) contentUsers.style.display = '';
+        // Загружаем все данные
+        loadSlides();
+        loadScreens();
+        loadUsers();
+        return;
+    }
+
+    // Для HR – только слайды и экраны
+    if (role === 'hr') {
+        if (tabSlides) tabSlides.style.display = '';
+        if (tabScreens) tabScreens.style.display = '';
+        if (tabUsers) tabUsers.style.display = 'none';
+        if (contentSlides) contentSlides.style.display = '';
+        if (contentScreens) contentScreens.style.display = '';
+        if (contentUsers) contentUsers.style.display = 'none';
+        // Загружаем только слайды и экраны
+        loadSlides();
+        loadScreens();
+        return;
+    }
+
+    // Для viewer – перенаправляем на плеер
+    if (role === 'viewer') {
+        window.location.href = '/index.html';
+        return;
+    }
+
+    // Если роль неизвестна – скрываем всё
+    if (tabSlides) tabSlides.style.display = 'none';
+    if (tabScreens) tabScreens.style.display = 'none';
+    if (tabUsers) tabUsers.style.display = 'none';
+    if (contentSlides) contentSlides.style.display = 'none';
+    if (contentScreens) contentScreens.style.display = 'none';
+    if (contentUsers) contentUsers.style.display = 'none';
+    document.querySelector('.container').innerHTML = '<div class="empty-state">Недостаточно прав для доступа к панели управления</div>';
+}
 
     </script>
 </body>
