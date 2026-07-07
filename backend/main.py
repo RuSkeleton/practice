@@ -6,7 +6,10 @@ from backend.websocket_manager import router as websocket_router
 from backend.database import engine, Base
 from backend.config import BASE_DIR, config
 
+from fastapi.staticfiles import StaticFiles
+
 FRONTEND_DIR = BASE_DIR / "frontend"
+STATIC_DIR = FRONTEND_DIR / "static"
 
 Base.metadata.create_all(bind=engine)
 
@@ -14,6 +17,12 @@ app = FastAPI(
     title="Digital Signage API",
     description="System for managing digital signage displays",
     version="2.0.0"
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory=STATIC_DIR),
+    name="static",
 )
 
 app.add_middleware(
