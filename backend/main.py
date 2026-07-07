@@ -4,6 +4,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api import auth_router
+from backend.api.slides import router as slides_router
+from backend.api.screens import router as screens_admin_router
 from backend.config import BASE_DIR, config
 from backend.database import Base, engine
 from backend.models import Screen
@@ -15,8 +17,6 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 UPLOADS_DIR = BASE_DIR / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Для учебного проекта оставляем автосоздание таблиц на случай свежей пустой БД.
-# Основной способ изменения схемы — Alembic-миграции.
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -33,12 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Старые роуты /api/slides/active, /api/screens/heartbeat и /ws/slides больше
-# не подключаются: экранный клиент теперь работает по контракту full/patch schedule.
 app.include_router(auth_router.router, prefix="/api", tags=["auth"])
 app.include_router(screen_client_router.router, prefix="/api", tags=["screen-client"])
 app.include_router(uploads_router.router, prefix="/api", tags=["uploads"])
 app.include_router(screens_websocket_router.router, tags=["screen-websocket"])
+app.include_router(slides_router, prefix="/api", tags=["slides"])
+app.include_router(screens_admin_router, prefix="/api", tags=["screens"])
 
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
@@ -64,28 +64,17 @@ def generate_code():
     return {"code": _generate_free_screen_code()}
 
 
-@app.get("/api/screens/generate-code")
-def generate_screen_code():
-    # Алиас под старую админку/прототип. Логику управления экранами команда
-    # сможет потом перенести в отдельный актуальный admin-router.
-    return {"code": _generate_free_screen_code()}
-
-
 @app.get("/main.html")
 async def get_main():
     return FileResponse(FRONTEND_DIR / "main.html")
-
 
 @app.get("/admin.html")
 async def get_admin():
     return FileResponse(FRONTEND_DIR / "admin.html")
 
-
 @app.get("/index.html")
 async def get_index():
-    # Активный экранный клиент — новый full/patch/cache player.
     return FileResponse(FRONTEND_DIR / "index.html")
-
 
 @app.get("/")
 def root():
@@ -102,7 +91,6 @@ def root():
 @app.on_event("startup")
 async def startup_event():
     print("Digital Signage API started")
-    # Создание администратора при первом запуске
     from backend.database import SessionLocal
     from backend import models, auth
 
@@ -124,5 +112,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("backend.main:app", host=config.HOST, port=config.PORT, reload=True)

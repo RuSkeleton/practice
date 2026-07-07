@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from backend import crud, schemas, models
 from backend.database import get_db
 from backend.auth import get_current_user, require_hr_or_admin
-from backend.websocket_manager import notify_clients
+from backend.routers.websocket import notify_schedule_updated, notify_slides_updated
+from backend.schedule_generator import ScheduleGenerator
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -15,8 +17,9 @@ def create_slide(
     current_user: models.User = Depends(require_hr_or_admin),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    db_slide = crud.create_slide(db, slide)
-    background_tasks.add_task(notify_clients, {"type": "slide_created", "id": db_slide.id})
+    db_slide = crud.create_slide(db, slide, current_user.id)
+    background_tasks.add_task(regenerate_schedule, db, background_tasks)
+    background_tasks.add_task(notify_slides_updated, [db_slide.id], "slide_created")
     return db_slide
 
 @router.get("/slides", response_model=List[schemas.SlideOut])
@@ -38,10 +41,11 @@ def update_slide(
     current_user: models.User = Depends(require_hr_or_admin),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    db_slide = crud.update_slide(db, slide_id, slide)
+    db_slide = crud.update_slide(db, slide_id, slide, current_user.id)
     if not db_slide:
         raise HTTPException(status_code=404, detail="Slide not found")
-    background_tasks.add_task(notify_clients, {"type": "slide_updated", "id": db_slide.id})
+    background_tasks.add_task(regenerate_schedule, db, background_tasks)
+    background_tasks.add_task(notify_slides_updated, [db_slide.id], "slide_updated")
     return db_slide
 
 @router.delete("/slides/{slide_id}")
@@ -53,5 +57,30 @@ def delete_slide(
 ):
     if not crud.delete_slide(db, slide_id):
         raise HTTPException(status_code=404, detail="Slide not found")
-    background_tasks.add_task(notify_clients, {"type": "slide_deleted", "id": slide_id})
+    background_tasks.add_task(regenerate_schedule, db, background_tasks)
+    background_tasks.add_task(notify_slides_updated, [slide_id], "slide_deleted")
     return {"ok": True}
+
+def regenerate_schedule(db: Session, background_tasks: BackgroundTasks):
+    now = datetime.utcnow()
+    window_size = 3600
+    slot_duration = 15
+    range_from = now
+    range_to = now + timedelta(days=3)
+
+    generator = ScheduleGenerator(db)
+    result = generator.generate_schedule(
+        window_size_seconds=window_size,
+        slot_duration_seconds=slot_duration,
+        range_from=range_from,
+        range_to=range_to
+    )
+    background_tasks.add_task(
+        notify_schedule_updated,
+        mode="full",
+        schedule_version=result.schedule_version,
+        previous_schedule_version=result.schedule_version - 1,
+        from_=range_from.isoformat() + "Z",
+        to=range_to.isoformat() + "Z",
+        reason="schedule_regenerated"
+    )
