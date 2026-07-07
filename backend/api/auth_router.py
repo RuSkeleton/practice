@@ -16,7 +16,7 @@ from backend.crud import (
     delete_user
 )
 from backend.schemas import UserCreate, UserUpdate, UserOut
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_admin, require_hr_or_admin
 
 router = APIRouter()
 
@@ -39,11 +39,6 @@ def register(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     hashed_password = auth.get_password_hash(user_data.password)
     user = crud.create_user(db, user_data.username, hashed_password)
     return {"message": "User created", "username": user.username}
-
-def require_admin(current_user: models.User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Требуется роль администратора")
-    return current_user
 
 @router.get("/users", response_model=list[UserOut])
 def list_users(

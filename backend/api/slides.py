@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from backend import crud, schemas, models
 from backend.database import get_db
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_hr_or_admin
 from backend.websocket_manager import notify_clients
 
 router = APIRouter()
@@ -12,7 +12,7 @@ router = APIRouter()
 def create_slide(
     slide: schemas.SlideCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_hr_or_admin),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     db_slide = crud.create_slide(db, slide)
@@ -35,7 +35,7 @@ def update_slide(
     slide_id: int,
     slide: schemas.SlideUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_hr_or_admin),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     db_slide = crud.update_slide(db, slide_id, slide)
@@ -48,7 +48,7 @@ def update_slide(
 def delete_slide(
     slide_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_hr_or_admin),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     if not crud.delete_slide(db, slide_id):
