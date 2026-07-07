@@ -70,8 +70,26 @@ def root():
     }
 
 @app.on_event("startup")
-async def startup_event():
-    print(" Digital Signage API started")
+def startup():
+    # Локальные импорты – они не затрагивают глобальные
+    from backend.database import SessionLocal
+    from backend import models, auth
+
+    db = SessionLocal()
+    try:
+        if db.query(models.User).count() == 0:
+            admin = models.User(
+                username="admin",
+                password_hash=auth.get_password_hash("admin123"),
+                role="admin",
+                full_name="Administrator",
+                is_active=True
+            )
+            db.add(admin)
+            db.commit()
+            print("Создан администратор по умолчанию: admin / admin123")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     import uvicorn

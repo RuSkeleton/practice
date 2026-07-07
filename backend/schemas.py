@@ -2,14 +2,30 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     username: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = "hr"
+
+class UserCreate(UserBase):
     password: str
 
-class UserOut(BaseModel):
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+class UserOut(UserBase):
     id: int
-    username: str
-    role: str
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
