@@ -56,3 +56,13 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
+
+def require_admin(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Требуется роль администратора")
+    return current_user
+
+def require_hr_or_admin(current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in ["hr", "admin"]:
+        raise HTTPException(status_code=403, detail="Недостаточно прав для управления контентом")
+    return current_user
