@@ -447,6 +447,18 @@
             });
         });
 
+        function localDateTimeToUtcIso(value) {
+            if (!value) return null;
+
+            // input[type="datetime-local"] возвращает локальное время без часового пояса.
+            // new Date(value) трактует его как локальное время браузера,
+            // а toISOString() переводит в UTC и добавляет Z.
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return null;
+
+            return date.toISOString();
+        }
+
         // Показывать/скрывать поле интервала при смене режима частоты
         document.getElementById('frequencyMode').addEventListener('change', function() {
             const group = document.getElementById('hardIntervalGroup');
@@ -458,8 +470,24 @@
             const name = document.getElementById('slideName').value;
             const kind = document.getElementById('slideKind').value;
             const content = document.getElementById('slideContent').value;
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
+            const startDateLocal = document.getElementById('startDate').value;
+            const endDateLocal = document.getElementById('endDate').value;
+            const startDate = localDateTimeToUtcIso(startDateLocal);
+            const endDate = localDateTimeToUtcIso(endDateLocal);
+
+            if (!startDate || !endDate) {
+                const msg = document.getElementById('formMessage');
+                msg.textContent = 'Ошибка: некорректные дата/время показа';
+                msg.className = 'form-message error';
+                return;
+            }
+
+            if (new Date(startDate).getTime() >= new Date(endDate).getTime()) {
+                const msg = document.getElementById('formMessage');
+                msg.textContent = 'Ошибка: дата окончания должна быть позже даты начала';
+                msg.className = 'form-message error';
+                return;
+            }
             const durationSlots = parseInt(document.getElementById('durationSlots').value) || 1;
             const frequencyMode = parseInt(document.getElementById('frequencyMode').value);
             const hardInterval = parseInt(document.getElementById('hardInterval').value) || null;

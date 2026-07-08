@@ -1,10 +1,17 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
-from datetime import datetime
 from backend import models, schemas, auth
 from typing import Optional
+from datetime import timezone
 
 # ----- Слайды (новая модель) -----
+
+def _to_utc_naive(dt):
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 def get_all_slides(db: Session):
     return db.query(models.Slide).order_by(models.Slide.created_at.desc()).all()
@@ -13,8 +20,12 @@ def get_slide(db: Session, slide_id: int):
     return db.query(models.Slide).filter(models.Slide.id == slide_id).first()
 
 def create_slide(db: Session, slide_data: schemas.SlideCreate, user_id: Optional[int] = None):
+    data = slide_data.model_dump()
+    data["start_date"] = _to_utc_naive(data["start_date"])
+    data["end_date"] = _to_utc_naive(data["end_date"])
+
     db_slide = models.Slide(
-        **slide_data.model_dump(),
+        **data,
         created_by=user_id,
         updated_by=user_id,
         revision=1
