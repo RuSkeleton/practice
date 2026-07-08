@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from datetime import datetime
 from backend import models, schemas, auth
+from typing import Optional
 
 # ----- Слайды (новая модель) -----
 
