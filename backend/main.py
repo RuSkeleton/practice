@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from backend.api import auth_router
 from backend.api.slides import router as slides_router
@@ -89,6 +88,20 @@ async def get_index():
 @app.get("/editor.html")
 async def go_editor():
     return FileResponse(FRONTEND_DIR / "editor.html")
+
+@app.get("/utils.js")
+async def get_utils_js():
+    return FileResponse(FRONTEND_DIR / "utils.js")
+
+
+@app.get("/image_cache.js")
+async def get_image_cache_js():
+    return FileResponse(FRONTEND_DIR / "image_cache.js")
+
+
+@app.get("/slide_rendering.js")
+async def get_slide_rendering_js():
+    return FileResponse(FRONTEND_DIR / "slide_rendering.js")
 
 @app.get("/")
 def root():

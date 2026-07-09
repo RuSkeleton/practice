@@ -236,6 +236,10 @@
         <span id="cacheInfo">Кэш: пусто</span>
     </div>
 
+    <script src="utils.js"></script>
+    <script src="image_cache.js"></script>
+    <script src="slide_rendering.js"></script>
+
     <script>
         "use strict";
 
@@ -260,6 +264,7 @@
             CACHE_PREFIX: "digital_signage_screen_client_v3",
             IMAGE_CACHE_NAME: "digital_signage_images_v2"
         });
+        window.CONFIG = CONFIG; // Нужно глобально для slide_renderin.js
 
         const ENDPOINTS = Object.freeze({
             activate: () => "/screens/activate",
@@ -370,6 +375,7 @@
             screenCodeDisplay: document.getElementById("screenCodeDisplay"),
             cacheInfo: document.getElementById("cacheInfo")
         });
+        window.DOM = DOM;
 
         // =========================================================
         // STARTUP
@@ -1236,7 +1242,7 @@
                 state.currentRenderKey = renderKey;
 
                 clearImageObjectUrls();
-                renderSlide(FALLBACK_SLIDE);
+                renderSlide(FALLBACK_SLIDE, DOM.slideRoot);
                 updateStatusUi();
                 return;
             }
@@ -1256,7 +1262,7 @@
             state.currentRenderKey = renderKey;
 
             clearImageObjectUrls();
-            renderSlide(slide);
+            renderSlide(slide, DOM.slideRoot);
             updateStatusUi();
         }
 
@@ -1305,7 +1311,7 @@
         // RENDER
         // =========================================================
 
-        function renderSlide(slide) {
+        /*function renderSlide(slide) {
             const canvas = document.createElement("section");
             canvas.className = "slide-canvas";
             canvas.setAttribute("aria-label", "Слайд " + slide.id);
@@ -1608,7 +1614,7 @@
             ctx.arcTo(x, y + height, x, y, r);
             ctx.arcTo(x, y, x + width, y, r);
             ctx.closePath();
-        }
+        }*/
 
         // =========================================================
         // STATUS UI
