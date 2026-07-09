@@ -276,6 +276,54 @@
             slidesBatch: () => "/slides/batch"
         });
 
+        const FALLBACK_SLIDE_ID = "0";
+
+        const FALLBACK_SLIDE = Object.freeze({
+            id: FALLBACK_SLIDE_ID,
+            background: {
+                type: "gradient",
+                value: "default"
+            },
+            elements: [
+                {
+                    id: "fallback-title",
+                    type: "text",
+                    role: "title",
+                    value: "Нет активных слайдов",
+                    layout: {
+                        x: 260,
+                        y: 420,
+                        width: 1400,
+                        height: 120,
+                        fontSize: 72,
+                        fontWeight: 800,
+                        color: "#ffffff",
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                        zIndex: 2
+                    }
+                },
+                {
+                    id: "fallback-text",
+                    type: "text",
+                    role: "body",
+                    value: "Контент появится автоматически",
+                    layout: {
+                        x: 360,
+                        y: 560,
+                        width: 1200,
+                        height: 80,
+                        fontSize: 36,
+                        fontWeight: 400,
+                        color: "#9eb0ca",
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                        zIndex: 2
+                    }
+                }
+            ]
+        });
+
         // Expected REST contract:
         // POST /api/screens/activate                         body: { code }
         // GET  /api/screens/{code}/schedule?mode=full&days=3 response: full schedule snapshot
@@ -834,7 +882,10 @@
             if (!schedule || !Array.isArray(schedule.schedule)) return [];
             const ids = new Set();
             for (const windowItem of schedule.schedule) {
-                for (const id of windowItem.queue || []) ids.add(String(id));
+                for (const id of windowItem.queue || []) {
+                    const slideId = String(id);
+                    if (slideId !== FALLBACK_SLIDE_ID) ids.add(slideId);
+                }
             }
             return [...ids];
         }
@@ -879,7 +930,11 @@
         }
 
         async function refreshSlidesByIds(ids, options = {}) {
-            const uniqueIds = [...new Set((ids || []).map(id => String(id)).filter(Boolean))];
+            const uniqueIds = [...new Set(
+                (ids || [])
+                    .map(id => String(id))
+                    .filter(id => id && id !== FALLBACK_SLIDE_ID)
+            )];
             if (uniqueIds.length === 0) return;
 
             try {
@@ -1170,6 +1225,19 @@
                 state.currentRenderKey = "";
                 showEmptyState("Нет текущего окна", "В расписании нет окна для текущего времени");
                 DOM.slideCounter.textContent = "0 / 0";
+                return;
+            }
+
+            if (selection.slideId === FALLBACK_SLIDE_ID) {
+                const renderKey = FALLBACK_SLIDE_ID + ":" + selection.windowStartMs + ":" + selection.slotIndex;
+                DOM.slideCounter.textContent = (selection.queueIndex + 1) + " / " + selection.queueLength;
+
+                if (!force && state.currentRenderKey === renderKey) return;
+                state.currentRenderKey = renderKey;
+
+                clearImageObjectUrls();
+                renderSlide(FALLBACK_SLIDE);
+                updateStatusUi();
                 return;
             }
 

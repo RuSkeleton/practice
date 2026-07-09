@@ -273,6 +273,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="slides">Слайды</button>
             <button class="tab" data-tab="screens">Экраны</button>
+            <button class="tab" data-tab="users">Пользователи</button>
         </div>
 
         <div id="tabSlides" class="tab-content active">
@@ -280,48 +281,53 @@
                 <h2>Создать слайд</h2>
                 <form id="slideForm">
                     <div class="form-group">
-                        <label>Тип слайда</label>
-                        <select id="slideType" required>
-                            <option value="text">Текстовое объявление</option>
-                            <option value="greeting">Поздравление</option>
+                        <label>Название слайда *</label>
+                        <input id="slideName" required placeholder="Введите название" />
+                    </div>
+                    <div class="form-group">
+                        <label>Тип (kind)</label>
+                        <select id="slideKind">
+                            <option value="announcement">Объявление</option>
                             <option value="image">Изображение</option>
+                            <option value="greeting">Поздравление</option>
                             <option value="metric">Показатель</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Заголовок</label>
-                        <input id="title" placeholder="Введите заголовок" />
+                    <div class="form-group" id="contentGroup">
+                        <label>Содержание (текст или URL изображения)</label>
+                        <textarea id="slideContent" placeholder="Введите текст или URL"></textarea>
                     </div>
-                    <div class="form-group">
-                        <label>Содержание</label>
-                        <textarea id="content" placeholder="Введите текст или URL картинки"></textarea>
-                    </div>
-                    <div id="extraFields" class="hidden">
+                    <div class="form-row">
                         <div class="form-group">
-                            <label>ФИО сотрудника</label>
-                            <input id="extraName" placeholder="Иван Петров" />
+                            <label>Дата начала *</label>
+                            <input id="startDate" type="datetime-local" required />
                         </div>
                         <div class="form-group">
-                            <label>Повод</label>
-                            <input id="extraReason" placeholder="День рождения" />
+                            <label>Дата окончания *</label>
+                            <input id="endDate" type="datetime-local" required />
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Дата начала</label>
-                            <input id="startDate" type="datetime-local" required />
+                            <label>Длительность (слотов)</label>
+                            <input id="durationSlots" type="number" value="1" min="1" max="4" />
                         </div>
                         <div class="form-group">
-                            <label>Дата окончания</label>
-                            <input id="endDate" type="datetime-local" required />
+                            <label>Режим частоты</label>
+                            <select id="frequencyMode">
+                                <option value="1">Обычный</option>
+                                <option value="2">Часто</option>
+                                <option value="3">Очень часто</option>
+                                <option value="4">Жёсткий интервал</option>
+                            </select>
                         </div>
                     </div>
+                    <div class="form-group" id="hardIntervalGroup" style="display:none;">
+                        <label>Интервал (>1)</label>
+                        <input id="hardInterval" type="number" value="5" min="2" />
+                    </div>
                     <div class="form-group">
-                        <label>Приоритет</label>
-                        <select id="priority">
-                            <option value="0">Обычный</option>
-                            <option value="1">Срочный</option>
-                        </select>
+                        <label><input id="isActive" type="checkbox" checked /> Активен</label>
                     </div>
                     <button type="submit" class="btn-primary">Опубликовать</button>
                 </form>
@@ -367,12 +373,57 @@
                 <div id="screensList"><p class="loading">Загрузка...</p></div>
             </div>
         </div>
+
+        <div id="tabUsers" class="tab-content">
+            <div class="card">
+                <h2>Управление пользователями</h2>
+                <form id="userForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Логин *</label>
+                            <input id="userUsername" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Пароль *</label>
+                            <input id="userPassword" type="password" required />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>ФИО</label>
+                            <input id="userFullName" />
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input id="userEmail" type="email" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Роль</label>
+                        <select id="userRole">
+                            <option value="hr">HR</option>
+                            <option value="admin">Администратор</option>
+                            <option value="viewer">Наблюдатель</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" id="userSubmitBtn">Создать</button>
+                    <button type="button" class="btn-secondary" id="userCancelBtn" style="display:none;">Отмена</button>
+                </form>
+                <div id="userFormMessage" class="form-message"></div>
+            </div>
+
+            <div class="card">
+                <h2>Список пользователей</h2>
+                <div id="usersList"><p class="loading">Загрузка...</p></div>
+            </div>
+        </div>
     </div>
 
     <script>
         const API_BASE = window.location.origin + '/api';
         let token = localStorage.getItem('token');
         if (!token) { window.location.href = 'main.html'; }
+        let currentUserRole = '';
 
         document.getElementById('logoutBtn').addEventListener('click', function() {
             localStorage.removeItem('token');
@@ -390,39 +441,100 @@
                 if (this.dataset.tab === 'screens') {
                     loadScreens();
                 }
+                if (this.dataset.tab === 'users') {
+                    loadUsers();
+                }
             });
         });
 
-        document.getElementById('slideType').addEventListener('change', function() {
-            const extra = document.getElementById('extraFields');
-            if (this.value === 'greeting') { extra.classList.remove('hidden'); } 
-            else { extra.classList.add('hidden'); }
+        function localDateTimeToUtcIso(value) {
+            if (!value) return null;
+
+            // input[type="datetime-local"] возвращает локальное время без часового пояса.
+            // new Date(value) трактует его как локальное время браузера,
+            // а toISOString() переводит в UTC и добавляет Z.
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return null;
+
+            return date.toISOString();
+        }
+
+        // Показывать/скрывать поле интервала при смене режима частоты
+        document.getElementById('frequencyMode').addEventListener('change', function() {
+            const group = document.getElementById('hardIntervalGroup');
+            group.style.display = (this.value === '4') ? 'block' : 'none';
         });
 
         document.getElementById('slideForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const type = document.getElementById('slideType').value;
-            const title = document.getElementById('title').value;
-            const content = document.getElementById('content').value;
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const priority = parseInt(document.getElementById('priority').value);
-            let extraData = {};
-            if (type === 'greeting') {
-                extraData = {
-                    name: document.getElementById('extraName').value,
-                    reason: document.getElementById('extraReason').value
-                };
+            const name = document.getElementById('slideName').value;
+            const kind = document.getElementById('slideKind').value;
+            const content = document.getElementById('slideContent').value;
+            const startDateLocal = document.getElementById('startDate').value;
+            const endDateLocal = document.getElementById('endDate').value;
+            const startDate = localDateTimeToUtcIso(startDateLocal);
+            const endDate = localDateTimeToUtcIso(endDateLocal);
+
+            if (!startDate || !endDate) {
+                const msg = document.getElementById('formMessage');
+                msg.textContent = 'Ошибка: некорректные дата/время показа';
+                msg.className = 'form-message error';
+                return;
             }
+
+            if (new Date(startDate).getTime() >= new Date(endDate).getTime()) {
+                const msg = document.getElementById('formMessage');
+                msg.textContent = 'Ошибка: дата окончания должна быть позже даты начала';
+                msg.className = 'form-message error';
+                return;
+            }
+            const durationSlots = parseInt(document.getElementById('durationSlots').value) || 1;
+            const frequencyMode = parseInt(document.getElementById('frequencyMode').value);
+            const hardInterval = parseInt(document.getElementById('hardInterval').value) || null;
+            const isActive = document.getElementById('isActive').checked;
+
+            // Формируем background и elements в зависимости от типа
+            const background = { type: "gradient", value: kind };
+            let elements = [];
+            if (kind === 'image') {
+                elements = [
+                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 80, width: 1600, height: 100, fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "image", type: "image", role: "main_image", src: content, alt: name, layout: { x: 420, y: 220, width: 1080, height: 640, objectFit: "contain", zIndex: 2 } }
+                ];
+            } else if (kind === 'greeting') {
+                elements = [
+                    { id: "title", type: "text", role: "title", value: "Поздравляем!", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "name", type: "text", role: "person_name", value: name, layout: { x: 220, y: 330, width: 1480, height: 120, fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "body", type: "text", role: "body", value: content || "День рождения!", layout: { x: 260, y: 520, width: 1400, height: 220, fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                ];
+            } else if (kind === 'metric') {
+                elements = [
+                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "value", type: "text", role: "metric_value", value: content || "—", layout: { x: 260, y: 350, width: 1400, height: 220, fontSize: 96, fontWeight: 800, color: "#d6ffe8", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                ];
+            } else {
+                // announcement
+                elements = [
+                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "body", type: "text", role: "body", value: content || "", layout: { x: 220, y: 320, width: 1480, height: 420, fontSize: 42, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                ];
+            }
+
             const slideData = {
-                type: type,
-                title: title || null,
-                content: content || null,
-                extra_data: Object.keys(extraData).length ? extraData : null,
+                name,
+                kind,
                 start_date: startDate,
                 end_date: endDate,
-                priority: priority
+                is_active: isActive,
+                duration_slots: durationSlots,
+                frequency_mode: frequencyMode,
+                hard_interval: (frequencyMode === 4) ? hardInterval : null,
+                is_emergency: false,
+                alarm_type: null,
+                background,
+                elements
             };
+
             try {
                 const response = await fetch(API_BASE + '/slides', {
                     method: 'POST',
@@ -437,7 +549,7 @@
                     msg.textContent = 'Слайд создан!';
                     msg.className = 'form-message success';
                     document.getElementById('slideForm').reset();
-                    document.getElementById('extraFields').classList.add('hidden');
+                    document.getElementById('isActive').checked = true;
                     loadSlides();
                 } else {
                     const err = await response.json();
@@ -468,16 +580,16 @@
                 container.innerHTML = '<div class="empty-state">Нет слайдов</div>';
                 return;
             }
-            const types = { text: 'Текст', greeting: 'Поздравление', image: 'Изображение', metric: 'Показатель' };
-            container.innerHTML = slides.map(function(s) {
+            const kindMap = { announcement: 'Объявление', image: 'Изображение', greeting: 'Поздравление', metric: 'Показатель' };
+            container.innerHTML = slides.map(s => {
                 const active = s.is_active && new Date(s.start_date) <= new Date() && new Date(s.end_date) >= new Date();
                 return '<div class="slide-item" style="border-left-color: ' + (active ? '#27ae60' : '#6a7a9a') + '">' +
                     '<div class="slide-info">' +
-                    '<div class="title">' + (s.title || '(без заголовка)') + '</div>' +
+                    '<div>' + (s.name || '(без названия)') + '</div>' +
                     '<div style="font-size:12px;color:#6a7a9a;">' +
-                    (types[s.type] || s.type) +
+                    (kindMap[s.kind] || s.kind) +
                     (active ? ' Активен' : ' Неактивен') +
-                    (s.priority === 1 ? ' Срочный' : '') +
+                    (s.frequency_mode === 4 ? ' (интервал '+s.hard_interval+')' : '') +
                     ' ' + new Date(s.start_date).toLocaleDateString() + ' -> ' + new Date(s.end_date).toLocaleDateString() +
                     '</div></div>' +
                     '<button class="delete-btn" onclick="deleteSlide(' + s.id + ')">Удалить</button></div>';
@@ -623,9 +735,217 @@
             } catch {}
         }
 
+        // ========== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ==========
+        let editingUserId = null;
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(API_BASE + '/users', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (response.ok) {
+                    const users = await response.json();
+                    renderUsers(users);
+                } else if (response.status === 403) {
+                    document.getElementById('usersList').innerHTML =
+                        '<div class="empty-state">Доступ запрещён (требуется администратор)</div>';
+                } else {
+                    document.getElementById('usersList').innerHTML =
+                        '<div class="empty-state">Ошибка загрузки пользователей</div>';
+                }
+            } catch {
+                document.getElementById('usersList').innerHTML =
+                    '<div class="empty-state">Ошибка подключения к серверу</div>';
+            }
+        }
+
+        function renderUsers(users) {
+            const container = document.getElementById('usersList');
+            if (!users || !users.length) {
+                container.innerHTML = '<div class="empty-state">Нет пользователей</div>';
+                return;
+            }
+            container.innerHTML = users.map(u => `
+                <div class="slide-item" style="border-left-color: ${u.is_active ? '#27ae60' : '#6a7a9a'};">
+                    <div class="slide-info">
+                        <div><strong>${u.username}</strong> (${u.full_name || '—'})</div>
+                        <div style="font-size:12px;color:#6a7a9a;">
+                            ${u.email || 'Нет email'} • Роль: ${u.role}
+                            ${u.is_active ? 'Активен' : 'Неактивен'}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn-secondary" onclick="editUser(${u.id})">✎</button>
+                        <button class="delete-btn" onclick="deleteUser(${u.id})">Удалить</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Удалить пользователя?')) return;
+            try {
+                const response = await fetch(API_BASE + '/users/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (response.ok) {
+                    loadUsers();
+                } else {
+                    alert('Ошибка при удалении');
+                }
+            } catch {
+                alert('Ошибка подключения');
+            }
+        }
+
+        // Функция загрузки профиля пользователя (добавлена из feature/user-logic)
+        async function loadUserProfile() {
+            try {
+                const response = await fetch(API_BASE + '/users/me', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (response.ok) {
+                    const user = await response.json();
+                    currentUserRole = user.role || 'viewer';
+                    applyRoleRestrictions();
+                } else {
+                    console.error('Ошибка получения профиля, статус:', response.status);
+                    document.querySelector('.container').innerHTML = '<div class="empty-state">Ошибка загрузки профиля. Проверьте права доступа.</div>';
+                }
+            } catch (error) {
+                console.error('Ошибка сети:', error);
+                document.querySelector('.container').innerHTML = '<div class="empty-state">Ошибка сети. Проверьте подключение к серверу.</div>';
+            }
+        }
+
+        function applyRoleRestrictions() {
+            const role = currentUserRole;
+            const tabSlides = document.querySelector('[data-tab="slides"]');
+            const tabScreens = document.querySelector('[data-tab="screens"]');
+            const tabUsers = document.querySelector('[data-tab="users"]');
+            const contentSlides = document.getElementById('tabSlides');
+            const contentScreens = document.getElementById('tabScreens');
+            const contentUsers = document.getElementById('tabUsers');
+
+            if (role === 'admin') {
+                if (tabSlides) tabSlides.style.display = '';
+                if (tabScreens) tabScreens.style.display = '';
+                if (tabUsers) tabUsers.style.display = '';
+                if (contentSlides) contentSlides.style.display = '';
+                if (contentScreens) contentScreens.style.display = '';
+                if (contentUsers) contentUsers.style.display = '';
+                loadSlides();
+                loadScreens();
+                loadUsers();
+                return;
+            }
+
+            if (role === 'hr') {
+                if (tabSlides) tabSlides.style.display = '';
+                if (tabScreens) tabScreens.style.display = '';
+                if (tabUsers) tabUsers.style.display = 'none';
+                if (contentSlides) contentSlides.style.display = '';
+                if (contentScreens) contentScreens.style.display = '';
+                if (contentUsers) contentUsers.style.display = 'none';
+                loadSlides();
+                loadScreens();
+                return;
+            }
+
+            if (role === 'viewer') {
+                window.location.href = '/index.html';
+                return;
+            }
+
+            // Если роль неизвестна – скрываем всё
+            if (tabSlides) tabSlides.style.display = 'none';
+            if (tabScreens) tabScreens.style.display = 'none';
+            if (tabUsers) tabUsers.style.display = 'none';
+            if (contentSlides) contentSlides.style.display = 'none';
+            if (contentScreens) contentScreens.style.display = 'none';
+            if (contentUsers) contentUsers.style.display = 'none';
+            document.querySelector('.container').innerHTML = '<div class="empty-state">Недостаточно прав для доступа к панели управления</div>';
+        }
+
+        function editUser(id) {
+            fetch(API_BASE + '/users/' + id, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Ошибка загрузки');
+                return res.json();
+            })
+            .then(user => {
+                editingUserId = id;
+                document.getElementById('userUsername').value = user.username;
+                document.getElementById('userFullName').value = user.full_name || '';
+                document.getElementById('userEmail').value = user.email || '';
+                document.getElementById('userRole').value = user.role || 'hr';
+                document.getElementById('userPassword').placeholder = 'Оставьте пустым, чтобы не менять';
+                document.getElementById('userPassword').required = false;
+                document.getElementById('userSubmitBtn').textContent = 'Сохранить';
+                document.getElementById('userCancelBtn').style.display = 'inline-block';
+                document.getElementById('userFormMessage').textContent = '';
+                document.getElementById('userFormMessage').className = 'form-message';
+            })
+            .catch(() => {
+                alert('Не удалось загрузить данные пользователя');
+            });
+        }
+
+        function resetUserForm() {
+            editingUserId = null;
+            document.getElementById('userForm').reset();
+            document.getElementById('userPassword').required = true;
+            document.getElementById('userPassword').placeholder = '';
+            document.getElementById('userSubmitBtn').textContent = 'Создать';
+            document.getElementById('userCancelBtn').style.display = 'none';
+            document.getElementById('userFormMessage').textContent = '';
+            document.getElementById('userFormMessage').className = 'form-message';
+        }
+
+        document.getElementById('userCancelBtn').addEventListener('click', resetUserForm);
+
+        document.getElementById('userForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const data = {
+                username: document.getElementById('userUsername').value,
+                full_name: document.getElementById('userFullName').value || null,
+                email: document.getElementById('userEmail').value || null,
+                role: document.getElementById('userRole').value,
+                password: document.getElementById('userPassword').value
+            };
+            const url = editingUserId ? API_BASE + '/users/' + editingUserId : API_BASE + '/users';
+            const method = editingUserId ? 'PUT' : 'POST';
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(data)
+                });
+                const msg = document.getElementById('userFormMessage');
+                if (response.ok) {
+                    msg.textContent = editingUserId ? 'Пользователь обновлён' : 'Пользователь создан';
+                    msg.className = 'form-message success';
+                    resetUserForm();
+                    loadUsers();
+                } else {
+                    const err = await response.json();
+                    msg.textContent = 'Ошибка: ' + (err.detail || 'Неизвестная ошибка');
+                    msg.className = 'form-message error';
+                }
+            } catch {
+                document.getElementById('userFormMessage').textContent = 'Ошибка подключения к серверу';
+                document.getElementById('userFormMessage').className = 'form-message error';
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
-            loadSlides();
-            loadScreens();
+            loadUserProfile();
         });
 
         setInterval(loadSlides, 5000);
