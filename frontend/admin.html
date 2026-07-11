@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -32,18 +33,24 @@
             font-size: 24px;
             color: #4a9eff;
         }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .change-password-btn,
         .logout-btn {
             padding: 8px 20px;
-            background: #e74c3c;
             color: #fff;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
         }
-        .logout-btn:hover {
-            background: #c0392b;
-        }
+        .change-password-btn { background: #2a3a5e; }
+        .change-password-btn:hover { background: #3a4a6e; }
+        .logout-btn { background: #e74c3c; }
+        .logout-btn:hover { background: #c0392b; }
         .tabs {
             display: flex;
             gap: 8px;
@@ -244,6 +251,27 @@
             text-align: center;
             padding: 20px;
         }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.72);
+        }
+        .modal-card {
+            width: min(440px, 100%);
+            padding: 24px;
+            border: 1px solid #2a3a5e;
+            border-radius: 12px;
+            background: #16213e;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+        }
+        .modal-card h2 { margin-bottom: 18px; color: #4a9eff; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .modal-actions button { flex: 1; }
         .hidden {
             display: none !important;
         }
@@ -267,7 +295,10 @@
     <div class="container">
         <header class="header">
             <h1>Управление системой</h1>
-            <button id="logoutBtn" class="logout-btn">Выйти</button>
+            <div class="header-actions">
+                <button id="changePasswordBtn" class="change-password-btn">Сменить пароль</button>
+                <button id="logoutBtn" class="logout-btn">Выйти</button>
+            </div>
         </header>
 
         <div class="tabs">
@@ -419,16 +450,59 @@
         </div>
     </div>
 
+    <div id="passwordModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <h2>Смена пароля</h2>
+            <form id="passwordChangeForm">
+                <div class="form-group">
+                    <label for="currentPassword">Текущий пароль</label>
+                    <input id="currentPassword" type="password" autocomplete="current-password" required />
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Новый пароль</label>
+                    <input id="newPassword" type="password" autocomplete="new-password" required />
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Повторите новый пароль</label>
+                    <input id="confirmPassword" type="password" autocomplete="new-password" required />
+                </div>
+                <div id="passwordMessage" class="form-message"></div>
+                <div class="modal-actions">
+                    <button type="button" id="passwordCancelBtn" class="btn-secondary">Отмена</button>
+                    <button type="submit" class="btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        "use strict";
+
         const API_BASE = window.location.origin + '/api';
-        let token = localStorage.getItem('token');
-        if (!token) { window.location.href = 'main.html'; }
+        const TOKEN_KEY = 'access_token';
+
+        // Новая версия хранит JWT только до закрытия окна браузера. Старый token
+        // из localStorage мигрируется один раз для мягкого обновления проекта.
+        let token = sessionStorage.getItem(TOKEN_KEY);
+        const legacyToken = localStorage.getItem('token');
+        if (!token && legacyToken) {
+            token = legacyToken;
+            sessionStorage.setItem(TOKEN_KEY, legacyToken);
+        }
+        localStorage.removeItem('token');
+
+        if (!token) {
+            window.location.replace('main.html');
+        }
         let currentUserRole = '';
 
-        document.getElementById('logoutBtn').addEventListener('click', function() {
+        function clearAuthAndRedirect() {
+            sessionStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem('token');
-            window.location.href = 'main.html';
-        });
+            window.location.replace('main.html');
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', clearAuthAndRedirect);
 
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', function() {
@@ -613,9 +687,20 @@
         if (generateBtn) {
             generateBtn.addEventListener('click', async function() {
                 try {
-                    const response = await fetch('/api/generate-code');
+                    // Генерация кода больше не является публичным endpoint'ом.
+                    const response = await fetch(API_BASE + '/screens/generate-code', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    if (response.status === 401) {
+                        clearAuthAndRedirect();
+                        return;
+                    }
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Не удалось сгенерировать код');
+                    }
                     const data = await response.json();
-                    document.getElementById('screenCode').value = data.code || '000';
+                    document.getElementById('screenCode').value = data.code || '';
                 } catch (error) {
                     console.error('Ошибка генерации кода:', error);
                     document.getElementById('screenCode').value = '000';
@@ -809,6 +894,8 @@
                     const user = await response.json();
                     currentUserRole = user.role || 'viewer';
                     applyRoleRestrictions();
+                } else if (response.status === 401) {
+                    clearAuthAndRedirect();
                 } else {
                     console.error('Ошибка получения профиля, статус:', response.status);
                     document.querySelector('.container').innerHTML = '<div class="empty-state">Ошибка загрузки профиля. Проверьте права доступа.</div>';
@@ -909,13 +996,20 @@
 
         document.getElementById('userForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            const passwordValue = document.getElementById('userPassword').value;
             const data = {
                 username: document.getElementById('userUsername').value,
                 full_name: document.getElementById('userFullName').value || null,
                 email: document.getElementById('userEmail').value || null,
-                role: document.getElementById('userRole').value,
-                password: document.getElementById('userPassword').value
+                role: document.getElementById('userRole').value
             };
+
+            // При редактировании пустое поле означает «не менять пароль».
+            // Не отправляем пустую строку: backend справедливо считает её
+            // некорректным новым паролем.
+            if (passwordValue) {
+                data.password = passwordValue;
+            }
             const url = editingUserId ? API_BASE + '/users/' + editingUserId : API_BASE + '/users';
             const method = editingUserId ? 'PUT' : 'POST';
             try {
@@ -941,6 +1035,72 @@
             } catch {
                 document.getElementById('userFormMessage').textContent = 'Ошибка подключения к серверу';
                 document.getElementById('userFormMessage').className = 'form-message error';
+            }
+        });
+
+        // ========== СМЕНА СОБСТВЕННОГО ПАРОЛЯ ==========
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordChangeForm = document.getElementById('passwordChangeForm');
+
+        document.getElementById('changePasswordBtn').addEventListener('click', function() {
+            passwordChangeForm.reset();
+            document.getElementById('passwordMessage').textContent = '';
+            document.getElementById('passwordMessage').className = 'form-message';
+            passwordModal.classList.remove('hidden');
+            document.getElementById('currentPassword').focus();
+        });
+
+        document.getElementById('passwordCancelBtn').addEventListener('click', function() {
+            passwordModal.classList.add('hidden');
+        });
+
+        passwordModal.addEventListener('click', function(event) {
+            if (event.target === passwordModal) passwordModal.classList.add('hidden');
+        });
+
+        passwordChangeForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const message = document.getElementById('passwordMessage');
+
+            if (newPassword !== confirmPassword) {
+                message.textContent = 'Новые пароли не совпадают';
+                message.className = 'form-message error';
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE + '/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                if (response.status === 401) {
+                    clearAuthAndRedirect();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Не удалось изменить пароль');
+                }
+
+                message.textContent = 'Пароль изменён. Выполняется повторный вход...';
+                message.className = 'form-message success';
+                window.setTimeout(clearAuthAndRedirect, 800);
+            } catch (error) {
+                message.textContent = 'Ошибка: ' + (error.message || 'не удалось изменить пароль');
+                message.className = 'form-message error';
             }
         });
 

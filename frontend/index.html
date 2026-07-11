@@ -404,7 +404,9 @@
                 const key = event.key.toLowerCase();
                 if ((event.ctrlKey && ["r", "w", "u"].includes(key)) || key === "f5") event.preventDefault();
             });
-            window.addEventListener("resize", scaleCurrentCanvas);
+            window.addEventListener("resize", function () {
+                scaleCurrentCanvas();
+            });
 
             DOM.codeInput.addEventListener("input", () => {
                 DOM.codeInput.value = DOM.codeInput.value.replace(/\D/g, "").slice(0, 3);
