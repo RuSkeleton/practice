@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8" />
@@ -10,16 +10,19 @@
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #1a1a2e;
             color: #fff;
             padding: 30px 20px;
         }
+
         .container {
             max-width: 900px;
             margin: 0 auto;
         }
+
         .header {
             display: flex;
             justify-content: space-between;
@@ -28,10 +31,12 @@
             padding-bottom: 16px;
             border-bottom: 1px solid #2a3a5e;
         }
-        .header h1 {
-            font-size: 24px;
-            color: #4a9eff;
-        }
+
+            .header h1 {
+                font-size: 24px;
+                color: #4a9eff;
+            }
+
         .logout-btn {
             padding: 8px 20px;
             background: #e74c3c;
@@ -41,9 +46,11 @@
             cursor: pointer;
             font-size: 14px;
         }
-        .logout-btn:hover {
-            background: #c0392b;
-        }
+
+            .logout-btn:hover {
+                background: #c0392b;
+            }
+
         .tabs {
             display: flex;
             gap: 8px;
@@ -51,6 +58,7 @@
             border-bottom: 1px solid #2a3a5e;
             padding-bottom: 8px;
         }
+
         .tab {
             padding: 10px 24px;
             background: transparent;
@@ -61,62 +69,74 @@
             font-size: 16px;
             font-weight: 500;
         }
-        .tab:hover {
-            color: #fff;
-            background: #0f1a2e;
-        }
-        .tab.active {
-            color: #4a9eff;
-            background: #0f1a2e;
-            border-bottom: 2px solid #4a9eff;
-        }
+
+            .tab:hover {
+                color: #fff;
+                background: #0f1a2e;
+            }
+
+            .tab.active {
+                color: #4a9eff;
+                background: #0f1a2e;
+                border-bottom: 2px solid #4a9eff;
+            }
+
         .tab-content {
             display: none;
         }
-        .tab-content.active {
-            display: block;
-        }
+
+            .tab-content.active {
+                display: block;
+            }
+
         .card {
             background: #16213e;
             padding: 24px;
             border-radius: 12px;
             margin-bottom: 24px;
         }
-        .card h2 {
-            margin-bottom: 20px;
-            font-size: 20px;
-            color: #4a9eff;
-        }
+
+            .card h2 {
+                margin-bottom: 20px;
+                font-size: 20px;
+                color: #4a9eff;
+            }
+
         .form-group {
             margin-bottom: 16px;
         }
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 500;
-            font-size: 14px;
-            color: #a0b4d0;
-        }
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid #2a3a5e;
-            border-radius: 8px;
-            background: #0f1a2e;
-            color: #fff;
-            font-size: 15px;
-        }
-        .form-group textarea {
-            min-height: 80px;
-            resize: vertical;
-        }
+
+            .form-group label {
+                display: block;
+                margin-bottom: 6px;
+                font-weight: 500;
+                font-size: 14px;
+                color: #a0b4d0;
+            }
+
+            .form-group input,
+            .form-group textarea,
+            .form-group select {
+                width: 100%;
+                padding: 10px 14px;
+                border: 1px solid #2a3a5e;
+                border-radius: 8px;
+                background: #0f1a2e;
+                color: #fff;
+                font-size: 15px;
+            }
+
+            .form-group textarea {
+                min-height: 80px;
+                resize: vertical;
+            }
+
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px;
         }
+
         .btn-primary {
             padding: 12px 32px;
             background: #27ae60;
@@ -128,9 +148,11 @@
             cursor: pointer;
             width: 100%;
         }
-        .btn-primary:hover {
-            background: #1e8449;
-        }
+
+            .btn-primary:hover {
+                background: #1e8449;
+            }
+
         .btn-secondary {
             padding: 10px 20px;
             background: #2a3a5e;
@@ -140,23 +162,28 @@
             cursor: pointer;
             font-size: 14px;
         }
-        .btn-secondary:hover {
-            background: #3a4a6e;
-        }
+
+            .btn-secondary:hover {
+                background: #3a4a6e;
+            }
+
         .form-message {
             margin-top: 12px;
             padding: 10px;
             border-radius: 6px;
             text-align: center;
         }
-        .form-message.success {
-            background: #1a3a2a;
-            color: #7ddfa0;
-        }
-        .form-message.error {
-            background: #3a1a1a;
-            color: #ff6b6b;
-        }
+
+            .form-message.success {
+                background: #1a3a2a;
+                color: #7ddfa0;
+            }
+
+            .form-message.error {
+                background: #3a1a1a;
+                color: #ff6b6b;
+            }
+
         .slide-item,
         .screen-item {
             display: flex;
@@ -168,19 +195,23 @@
             margin-bottom: 8px;
             border-left: 4px solid #4a9eff;
         }
+
         .slide-info,
         .screen-info {
             flex: 1;
         }
+
         .screen-header {
             display: flex;
             gap: 16px;
             align-items: center;
             flex-wrap: wrap;
         }
+
         .screen-name {
             font-weight: 600;
         }
+
         .screen-code {
             background: #1a2a4a;
             padding: 2px 12px;
@@ -190,22 +221,27 @@
             font-weight: bold;
             color: #4a9eff;
         }
+
         .screen-status.online {
             color: #27ae60;
         }
+
         .screen-status.offline {
             color: #6a7a9a;
         }
+
         .screen-meta {
             font-size: 12px;
             color: #6a7a9a;
             margin-top: 4px;
         }
+
         .screen-actions {
             display: flex;
             gap: 8px;
             align-items: center;
         }
+
         .btn-connect {
             padding: 6px 16px;
             background: #27ae60;
@@ -214,6 +250,7 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
         .btn-disconnect {
             padding: 6px 16px;
             background: #e67e22;
@@ -222,6 +259,7 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
         .delete-btn {
             padding: 6px 14px;
             background: transparent;
@@ -230,32 +268,39 @@
             border-radius: 6px;
             cursor: pointer;
         }
-        .delete-btn:hover {
-            background: #ff6b6b;
-            color: #fff;
-        }
+
+            .delete-btn:hover {
+                background: #ff6b6b;
+                color: #fff;
+            }
+
         .empty-state {
             text-align: center;
             padding: 40px 20px;
             color: #6a7a9a;
         }
+
         .loading {
             color: #6a7a9a;
             text-align: center;
             padding: 20px;
         }
+
         .hidden {
             display: none !important;
         }
+
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
             }
+
             .header {
                 flex-direction: column;
                 gap: 12px;
                 text-align: center;
             }
+
             .tabs {
                 flex-wrap: wrap;
                 justify-content: center;
@@ -274,7 +319,14 @@
             <button class="tab active" data-tab="slides">Слайды</button>
             <button class="tab" data-tab="screens">Экраны</button>
             <button class="tab" data-tab="users">Пользователи</button>
+            <button class="tab" data-tab="shit">Тестовая говна</button>
         </div>
+
+
+        <!-- --------------------------------------------- -->
+        <!-- Управление слайдами фронт -->
+        <!-- --------------------------------------------- -->
+
 
         <div id="tabSlides" class="tab-content active">
             <div class="card">
@@ -292,10 +344,6 @@
                             <option value="greeting">Поздравление</option>
                             <option value="metric">Показатель</option>
                         </select>
-                    </div>
-                    <div class="form-group" id="contentGroup">
-                        <label>Содержание (текст или URL изображения)</label>
-                        <textarea id="slideContent" placeholder="Введите текст или URL"></textarea>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -340,6 +388,12 @@
             </div>
         </div>
 
+
+        <!-- --------------------------------------------- -->
+        <!-- Управление экранами фронт -->
+        <!-- --------------------------------------------- -->
+
+
         <div id="tabScreens" class="tab-content">
             <div class="card" style="display:block !important; visibility:visible !important; opacity:1 !important;">
                 <h2>Подключить экран</h2>
@@ -373,6 +427,12 @@
                 <div id="screensList"><p class="loading">Загрузка...</p></div>
             </div>
         </div>
+
+
+        <!-- --------------------------------------------- -->
+        <!-- Управление пользователями фронт -->
+        <!-- --------------------------------------------- -->
+
 
         <div id="tabUsers" class="tab-content">
             <div class="card">
@@ -417,21 +477,124 @@
                 <div id="usersList"><p class="loading">Загрузка...</p></div>
             </div>
         </div>
+
+
+        <!-- --------------------------------------------- -->
+        <!-- Тестовая зона для редактора фронт -->
+        <!-- --------------------------------------------- -->
+
+
+        <div id="tabShit" class="tab-content">
+
+            <div id="preview-place"></div>
+
+            <form id="textForm" class="element-form hidden">
+                <div class="form-group">
+                    <label>Содержание</label>
+                    <textarea id="text-content" placeholder="Введите текст"></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Сохранить изменения</button>
+            </form>
+
+
+            <form id="sharedTextForm" class="element-form hidden">
+                <div class="form-group">
+                    <label>Размер шрифта</label>
+                    <input id="text-size" type="number" placeholder="14" />
+                </div>
+                <div class="form-group">
+                    <label>Цвет</label>
+                    <input id="text-color" type="color" placeholder="#ffffff" />
+                </div>
+                <button type="submit" class="btn-primary">Сохранить изменения</button>
+            </form>
+
+            <form id="imageForm" class="element-form hidden">
+                <div class="form-group text-field">
+                    <label>Ссылка на изображение</label>
+                    <input id="image-content" placeholder="Введите ссылку на изображение" />
+                </div>
+                <div class="form-group text">
+                    <label>Замещающий текст</label>
+                    <input id="image-replacement" placeholder="Текст при неудачной загрузке" />
+                </div>
+                <button type="submit" class="btn-primary">Сохранить изменения</button>
+            </form>
+
+            <form id="metricForm" class="element-form hidden">
+                <div class="form-group">
+                    <label>Отображение метрики</label>
+                    <select id="metric-rendering" required>
+                        <option value="metric">Одиночное значение</option>
+                        <option value="chart-line">Временной ряд, линия</option>
+                        <option value="chart-bars">Временной ряд, столбцы</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Название метрики</label>
+                    <select id="metric-name" required>
+                        <option value="metric">Одиночное значение</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">Сохранить изменения</button>
+            </form>
+
+            <form id="layoutForm" class="element-form">
+                <div class="form-group">
+                    <label>Общие параметры</label>
+                    <select id="positioning-type" required>
+                        <option value="absolute">Независимый</option>
+                        <option value="relative">Привязанный к другим элементам</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Абсолютные координаты</label>
+                    <label>X</label>
+                    <input id="x-coord" placeholder="0" />
+                    <label>Y</label>
+                    <input id="y-coord" placeholder="0" />
+                </div>
+                <div class="form-group form-row">
+                    <label>Расстояние от других элементов в относительных координатах</label>
+                    <label>Слева</label>
+                    <input id="left-padding" placeholder="0" />
+                    <label>Справа</label>
+                    <input id="right-padding" placeholder="0" />
+                    <label>Сверху</label>
+                    <input id="top-padding" placeholder="0" />
+                    <label>Снизу</label>
+                    <input id="bottom-padding" placeholder="0" />
+                </div>
+                <button type="submit" class="btn-primary">Сохранить изменения</button>
+            </form>
+
+
+            <div id="formMessage" class="form-message"></div>
+            <div id="preview-place"></div>
+        </div>
     </div>
 
+    <script src="slide_rendering.js"></script>
+    <script src="utils.js"></script>
     <script>
+
+        // ---------------------------------------------
+        // Управление слайдами, скрипты
+        // ---------------------------------------------
+
+
         const API_BASE = window.location.origin + '/api';
         let token = localStorage.getItem('token');
         if (!token) { window.location.href = 'main.html'; }
         let currentUserRole = '';
 
-        document.getElementById('logoutBtn').addEventListener('click', function() {
+        document.getElementById('logoutBtn').addEventListener('click', function () {
             localStorage.removeItem('token');
             window.location.href = 'main.html';
         });
 
         document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', function() {
+            tab.addEventListener('click', function () {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 this.classList.add('active');
@@ -460,16 +623,54 @@
         }
 
         // Показывать/скрывать поле интервала при смене режима частоты
-        document.getElementById('frequencyMode').addEventListener('change', function() {
+        document.getElementById('frequencyMode').addEventListener('change', function () {
             const group = document.getElementById('hardIntervalGroup');
             group.style.display = (this.value === '4') ? 'block' : 'none';
         });
 
-        document.getElementById('slideForm').addEventListener('submit', async function(e) {
+        function setElementsByTemplate() {
+            let els;
+            var kind = document.getElementById("slideKind").value;
+            if (kind === "image") {
+                els = [
+                    { id: "title", type: "text", role: "title", value: "Текст", layout: { x: 160, y: 80, width: 1600, height: 100, fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "image", type: "image", role: "main_image", src: "https://static.1000.menu/img/content-v2/97/7b/36007/prostoi-i-vkusnyi-shokoladnyi-tort_1762166750_0_w9vmk7h_max.jpg", alt: "Описание изображения", layout: { x: 420, y: 220, width: 780, height: 640, objectFit: "fill", zIndex: 2 } }
+                ];
+            } else if (kind === "greeting") {
+                els = [
+                    { id: "title", type: "text", role: "title", value: "Поздравляем!", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "name", type: "text", role: "person_name", value: "ФИО", layout: { x: 220, y: 330, width: 1480, height: 120, fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "body", type: "text", role: "body", value: "Повод для праздника", layout: { x: 260, y: 520, width: 1400, height: 220, fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                ];
+            } else if (kind === "metric") {
+                els = [
+                    { id: "title", type: "text", role: "title", value: "Х", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "value", type: "text", role: "metric_value", value: "условных единиц" || "—", layout: { x: 260, y: 350, width: 1400, height: 220, fontSize: 96, fontWeight: 800, color: "#d6ffe8", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                ];
+            } else if (kind === "announcement") {
+                // announcement
+                els = [
+                    { id: "title", type: "text", role: "title", value: "Заголовок", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
+                    { id: "body", type: "text", role: "body", value: "Текст", layout: { x: 220, y: 320, width: 1480, height: 420, fontSize: 42, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                ];
+            }
+            return els;
+        };
+
+        // Формируем background и elements в зависимости от типа
+        const background = { type: "gradient", value: "default" };
+        let elements = [];
+
+        document.getElementById("slideKind").addEventListener('change', function () {
+            elements = setElementsByTemplate();
+            pseudoUpdateRedactor();
+        });
+        elements = setElementsByTemplate();
+
+        document.getElementById('slideForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const name = document.getElementById('slideName').value;
             const kind = document.getElementById('slideKind').value;
-            const content = document.getElementById('slideContent').value;
             const startDateLocal = document.getElementById('startDate').value;
             const endDateLocal = document.getElementById('endDate').value;
             const startDate = localDateTimeToUtcIso(startDateLocal);
@@ -492,33 +693,6 @@
             const frequencyMode = parseInt(document.getElementById('frequencyMode').value);
             const hardInterval = parseInt(document.getElementById('hardInterval').value) || null;
             const isActive = document.getElementById('isActive').checked;
-
-            // Формируем background и elements в зависимости от типа
-            const background = { type: "gradient", value: kind };
-            let elements = [];
-            if (kind === 'image') {
-                elements = [
-                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 80, width: 1600, height: 100, fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "image", type: "image", role: "main_image", src: content, alt: name, layout: { x: 420, y: 220, width: 1080, height: 640, objectFit: "contain", zIndex: 2 } }
-                ];
-            } else if (kind === 'greeting') {
-                elements = [
-                    { id: "title", type: "text", role: "title", value: "Поздравляем!", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "name", type: "text", role: "person_name", value: name, layout: { x: 220, y: 330, width: 1480, height: 120, fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: content || "День рождения!", layout: { x: 260, y: 520, width: 1400, height: 220, fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
-                ];
-            } else if (kind === 'metric') {
-                elements = [
-                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "value", type: "text", role: "metric_value", value: content || "—", layout: { x: 260, y: 350, width: 1400, height: 220, fontSize: 96, fontWeight: 800, color: "#d6ffe8", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
-                ];
-            } else {
-                // announcement
-                elements = [
-                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: content || "", layout: { x: 220, y: 320, width: 1480, height: 420, fontSize: 42, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
-                ];
-            }
 
             const slideData = {
                 name,
@@ -571,7 +745,7 @@
                     const slides = await response.json();
                     renderSlides(slides);
                 }
-            } catch {}
+            } catch { }
         }
 
         function renderSlides(slides) {
@@ -589,7 +763,7 @@
                     '<div style="font-size:12px;color:#6a7a9a;">' +
                     (kindMap[s.kind] || s.kind) +
                     (active ? ' Активен' : ' Неактивен') +
-                    (s.frequency_mode === 4 ? ' (интервал '+s.hard_interval+')' : '') +
+                    (s.frequency_mode === 4 ? ' (интервал ' + s.hard_interval + ')' : '') +
                     ' ' + new Date(s.start_date).toLocaleDateString() + ' -> ' + new Date(s.end_date).toLocaleDateString() +
                     '</div></div>' +
                     '<button class="delete-btn" onclick="deleteSlide(' + s.id + ')">Удалить</button></div>';
@@ -604,14 +778,21 @@
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 loadSlides();
-            } catch {}
+            } catch { }
         }
+
+
+        // ---------------------------------------------
+        // Управление экранами, скрипты
+        // ---------------------------------------------
+
+
 
         const generateBtn = document.getElementById('generateCodeBtn');
         const addBtn = document.getElementById('addScreenBtn');
 
         if (generateBtn) {
-            generateBtn.addEventListener('click', async function() {
+            generateBtn.addEventListener('click', async function () {
                 try {
                     const response = await fetch('/api/generate-code');
                     const data = await response.json();
@@ -624,7 +805,7 @@
         }
 
         if (addBtn) {
-            addBtn.addEventListener('click', async function() {
+            addBtn.addEventListener('click', async function () {
                 const code = document.getElementById('screenCode').value;
                 if (!code || code.length !== 3 || !/^\d{3}$/.test(code)) {
                     showScreenMessage('Введите 3 цифры', 'error');
@@ -664,7 +845,7 @@
             const el = document.getElementById('screenFormMessage');
             el.textContent = text;
             el.className = 'form-message ' + type;
-            setTimeout(function() { el.textContent = ''; el.className = 'form-message'; }, 5000);
+            setTimeout(function () { el.textContent = ''; el.className = 'form-message'; }, 5000);
         }
 
         async function loadScreens() {
@@ -676,7 +857,7 @@
                     const screens = await response.json();
                     renderScreens(screens);
                 }
-            } catch {}
+            } catch { }
         }
 
         function renderScreens(screens) {
@@ -685,7 +866,7 @@
                 container.innerHTML = '<div class="empty-state">Нет экранов</div>';
                 return;
             }
-            container.innerHTML = screens.map(function(s) {
+            container.innerHTML = screens.map(function (s) {
                 return '<div class="screen-item">' +
                     '<div class="screen-info">' +
                     '<div class="screen-header">' +
@@ -710,7 +891,7 @@
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 loadScreens();
-            } catch {}
+            } catch { }
         }
 
         async function disconnectScreen(id) {
@@ -721,7 +902,7 @@
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 loadScreens();
-            } catch {}
+            } catch { }
         }
 
         async function deleteScreen(id) {
@@ -732,10 +913,17 @@
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 loadScreens();
-            } catch {}
+            } catch { }
         }
 
-        // ========== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ==========
+
+
+        // ---------------------------------------------
+        // Управление пользователями, скрипты
+        // ---------------------------------------------
+
+
+
         let editingUserId = null;
 
         async function loadUsers() {
@@ -766,20 +954,20 @@
                 return;
             }
             container.innerHTML = users.map(u => `
-                <div class="slide-item" style="border-left-color: ${u.is_active ? '#27ae60' : '#6a7a9a'};">
-                    <div class="slide-info">
-                        <div><strong>${u.username}</strong> (${u.full_name || '—'})</div>
-                        <div style="font-size:12px;color:#6a7a9a;">
-                            ${u.email || 'Нет email'} • Роль: ${u.role}
-                            ${u.is_active ? 'Активен' : 'Неактивен'}
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button class="btn-secondary" onclick="editUser(${u.id})">✎</button>
-                        <button class="delete-btn" onclick="deleteUser(${u.id})">Удалить</button>
-                    </div>
-                </div>
-            `).join('');
+                            <div class="slide-item" style="border-left-color: ${u.is_active ? '#27ae60' : '#6a7a9a'};">
+                                <div class="slide-info">
+                                    <div><strong>${u.username}</strong> (${u.full_name || '—'})</div>
+                                    <div style="font-size:12px;color:#6a7a9a;">
+                                        ${u.email || 'Нет email'} • Роль: ${u.role}
+                                        ${u.is_active ? 'Активен' : 'Неактивен'}
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="btn-secondary" onclick="editUser(${u.id})">✎</button>
+                                    <button class="delete-btn" onclick="deleteUser(${u.id})">Удалить</button>
+                                </div>
+                            </div>
+                        `).join('');
         }
 
         async function deleteUser(id) {
@@ -872,26 +1060,26 @@
             fetch(API_BASE + '/users/' + id, {
                 headers: { 'Authorization': 'Bearer ' + token }
             })
-            .then(res => {
-                if (!res.ok) throw new Error('Ошибка загрузки');
-                return res.json();
-            })
-            .then(user => {
-                editingUserId = id;
-                document.getElementById('userUsername').value = user.username;
-                document.getElementById('userFullName').value = user.full_name || '';
-                document.getElementById('userEmail').value = user.email || '';
-                document.getElementById('userRole').value = user.role || 'hr';
-                document.getElementById('userPassword').placeholder = 'Оставьте пустым, чтобы не менять';
-                document.getElementById('userPassword').required = false;
-                document.getElementById('userSubmitBtn').textContent = 'Сохранить';
-                document.getElementById('userCancelBtn').style.display = 'inline-block';
-                document.getElementById('userFormMessage').textContent = '';
-                document.getElementById('userFormMessage').className = 'form-message';
-            })
-            .catch(() => {
-                alert('Не удалось загрузить данные пользователя');
-            });
+                .then(res => {
+                    if (!res.ok) throw new Error('Ошибка загрузки');
+                    return res.json();
+                })
+                .then(user => {
+                    editingUserId = id;
+                    document.getElementById('userUsername').value = user.username;
+                    document.getElementById('userFullName').value = user.full_name || '';
+                    document.getElementById('userEmail').value = user.email || '';
+                    document.getElementById('userRole').value = user.role || 'hr';
+                    document.getElementById('userPassword').placeholder = 'Оставьте пустым, чтобы не менять';
+                    document.getElementById('userPassword').required = false;
+                    document.getElementById('userSubmitBtn').textContent = 'Сохранить';
+                    document.getElementById('userCancelBtn').style.display = 'inline-block';
+                    document.getElementById('userFormMessage').textContent = '';
+                    document.getElementById('userFormMessage').className = 'form-message';
+                })
+                .catch(() => {
+                    alert('Не удалось загрузить данные пользователя');
+                });
         }
 
         function resetUserForm() {
@@ -907,7 +1095,7 @@
 
         document.getElementById('userCancelBtn').addEventListener('click', resetUserForm);
 
-        document.getElementById('userForm').addEventListener('submit', async function(e) {
+        document.getElementById('userForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const data = {
                 username: document.getElementById('userUsername').value,
@@ -944,11 +1132,102 @@
             }
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             loadUserProfile();
         });
 
         setInterval(loadSlides, 5000);
+
+
+
+        // ---------------------------------------------
+        // Тестовая зона для редактора, скрипты
+        // ---------------------------------------------
+
+
+        let redactedElIndex = -1;
+
+        function pseudoUpdateRedactor() {
+            renderSlide({background, elements}, document.getElementById("preview-place"));
+            document.getElementById("preview-place").querySelectorAll('.slide-element').forEach((el, index) => {
+                el.addEventListener('click', function (event) {
+                    const formsOfSeparateElements = document.querySelectorAll(".element-form");
+                    redactedElIndex = index;
+                    console.log(redactedElIndex);
+                    formsOfSeparateElements.forEach(form => {
+                        form.classList.add("hidden");
+                    });
+                    if (this.classList.contains('slide-text')) {
+                        document.getElementById("textForm").classList.remove("hidden");
+                        fillTextFormWithValues(document.getElementById("textForm"), elements[index]);
+                        document.getElementById("text-content").focus();
+                    }
+                    else if (this.classList.contains('slide-image-element')) {
+                        document.getElementById("imageForm").classList.remove("hidden");
+                        fillImageFormWithValues(document.getElementById("imageForm"), elements[index]);
+                        document.getElementById("image-content").focus();
+                    }
+                    else if (this.classList.contains("slide-chart") || this.classList.contains("metric-value")) {
+                        document.getElementById("metricForm").classList.remove("hidden");
+                        fillMetricFormWithValues(document.getElementById("metricForm"), elements[index]);
+                    };
+
+                });
+            });
+        };
+
+        function fillTextFormWithValues(textform, element) {
+            textform.querySelector("#text-content").value = element.value;
+            textform.querySelector("#text-size").value = element.layout.fontSize;
+            textform.querySelector("#text-color").value = element.layout.color;
+        }
+
+        function fillImageFormWithValues(imageform, element) {
+            imageform.querySelector("#image-content").value = element.src;
+            imageform.querySelector("#image-replacement").value = element.alt;
+        }
+
+        function fillMetricFormWithValues(metricform, element) {
+            if (element.type === "metric") {
+                metricform.querySelector("#image-content").value = "metric";
+            } else if (element.type === "clart" && element.chartType === "bar") {
+                metricform.querySelector("#image-content").value = "chart-bar";
+            } else {
+                metricform.querySelector("#image-content").value = "chart-line";
+            }
+        }
+
+        document.getElementById("textForm").addEventListener('submit', async function (e) {
+            e.preventDefault();
+            console.log(elements[redactedElIndex].value);
+            elements[redactedElIndex].value = document.getElementById("text-content").value;
+            elements[redactedElIndex].layout.fontSize = parseInt(document.getElementById("text-size").value);
+            elements[redactedElIndex].layout.color = document.getElementById("text-color").value;
+            pseudoUpdateRedactor();
+        });
+
+        document.getElementById("imageForm").addEventListener('submit', async function (e) {
+            e.preventDefault();
+            elements[redactedElIndex].src = document.getElementById("image-content").value;
+            elements[redactedElIndex].alt = document.getElementById("image-replacement").value;
+            pseudoUpdateRedactor();
+        });
+
+        document.getElementById("metricForm").addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            if (document.getElementById("metric-rendering").value === "metric") {
+                elements[redactedElIndex].type = "metric";
+            } else if (document.getElementById("metric-rendering").value === "chart-bar") {
+                elements[redactedElIndex].type = "chart";
+                elements[redactedElIndex].chartType = "bar";
+            } else {
+                elements[redactedElIndex].type = "chart";
+                elements[redactedElIndex].chartType = "line";
+            }
+            pseudoUpdateRedactor();
+        });
+        pseudoUpdateRedactor();
     </script>
 </body>
 </html>
