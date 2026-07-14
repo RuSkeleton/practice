@@ -137,6 +137,11 @@
             gap: 16px;
         }
 
+        .button-row {
+            display: grid;
+            flex-direction: row;
+        }
+
         .btn-primary {
             padding: 12px 32px;
             background: #27ae60;
@@ -493,21 +498,46 @@
                     <label>Содержание</label>
                     <textarea id="text-content" placeholder="Введите текст"></textarea>
                 </div>
-                <button type="submit" class="btn-primary">Сохранить изменения</button>
             </form>
 
 
-            <form id="sharedTextForm" class="element-form hidden">
+            <form id="sharedTextForm" class="element-form">
+                <div class="form-group">
+                    <label>Шрифт</label>
+                    <select id="text-font" required></select>
+                </div>
                 <div class="form-group">
                     <label>Размер шрифта</label>
-                    <input id="text-size" type="number" placeholder="14" />
+                    <input id="text-size" type="number" />
                 </div>
                 <div class="form-group">
                     <label>Цвет</label>
-                    <input id="text-color" type="color" placeholder="#ffffff" />
+                    <input id="text-color" type="color" />
                 </div>
-                <button type="submit" class="btn-primary">Сохранить изменения</button>
+
+                <div class="form-group">
+                    <label>Горизонтальное выравнивание</label>
+                    <div class="btn-group" data-toggle="buttons">
+                        <label class="btn btn-primary active">
+                            <input type="radio" name="text-align" value="left" checked> По левому краю
+                        </label>
+                        <label class="btn btn-primary">
+                            <input type="radio" name="text-align" value="center"> По правому краю
+                        </label>
+                        <label class="btn btn-primary">
+                            <input type="radio" name="text-align" value="right"> По центру
+                        </label>
+                        <label class="btn btn-primary">
+                            <input type="radio" name="text-align" value="justify"> По ширине
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Толщина шрифта: </label>
+                    <input id="text-weight" type="number" step="100" />
+                </div>
             </form>
+
 
             <form id="imageForm" class="element-form hidden">
                 <div class="form-group text-field">
@@ -518,7 +548,29 @@
                     <label>Замещающий текст</label>
                     <input id="image-replacement" placeholder="Текст при неудачной загрузке" />
                 </div>
-                <button type="submit" class="btn-primary">Сохранить изменения</button>
+                <label>Настройка пропорций</label>
+                <div class="btn-group" data-toggle="buttons">
+                    <label class="btn btn-primary active">
+                        <input type="radio" name="object-fit" value="fill" checked> Заполнить область
+                    </label>
+                    <label class="btn btn-primary">
+                        <input type="radio" name="object-fit" value="contain"> Вместить в область
+                    </label>
+                    <label class="btn btn-primary">
+                        <input type="radio" name="object-fit" value="cover"> Обрезать по области
+                    </label>
+                </div>
+            </form>
+
+            <form id="figureForm" class="element-form hidden">
+                <div class="form-group text-field">
+                    <label>Ширина элемента:</label>
+                    <input id="figure-width" type="number" step="50" />
+                </div>
+                <div class="form-group text">
+                    <label>Высота элемента:</label>
+                    <input id="figure-height" type="number" step="50" />
+                </div>
             </form>
 
             <form id="metricForm" class="element-form hidden">
@@ -536,8 +588,27 @@
                         <option value="metric">Одиночное значение</option>
                     </select>
                 </div>
-                <button type="submit" class="btn-primary">Сохранить изменения</button>
+                <div class="form-group">
+                    <label>Цвет графика</label>
+                    <input id="metric-color" type="color" />
+                </div>
             </form>
+
+            <form id="shapeForm" class="element-form hidden">
+                <div class="form-group">
+                    <label>Тип фигуры</label>
+                    <select id="shape-subtype" required>
+                        <option value="circle">Круг</option>
+                        <option value="chart-line">Прямоугольник</option>
+                        <option value="chart-bars">Треугольник</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Цвет фигуры</label>
+                    <input id="shape-color" type="color" />
+                </div>
+            </form>
+
 
             <form id="layoutForm" class="element-form">
                 <div class="form-group">
@@ -557,13 +628,13 @@
                 <div class="form-group form-row">
                     <label>Расстояние от других элементов в относительных координатах</label>
                     <label>Слева</label>
-                    <input id="left-padding" placeholder="0" />
+                    <input id="left-margin" placeholder="0" />
                     <label>Справа</label>
-                    <input id="right-padding" placeholder="0" />
+                    <input id="right-margin" placeholder="0" />
                     <label>Сверху</label>
-                    <input id="top-padding" placeholder="0" />
+                    <input id="top-margin" placeholder="0" />
                     <label>Снизу</label>
-                    <input id="bottom-padding" placeholder="0" />
+                    <input id="bottom-margin" placeholder="0" />
                 </div>
                 <button type="submit" class="btn-primary">Сохранить изменения</button>
             </form>
@@ -633,26 +704,26 @@
             var kind = document.getElementById("slideKind").value;
             if (kind === "image") {
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Текст", text: { fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 160, y: 80, align: "center", zIndex: 2} },
-                    { id: "image", type: "image", role: "main_image", src: "https://static.1000.menu/img/content-v2/97/7b/36007/prostoi-i-vkusnyi-shokoladnyi-tort_1762166750_0_w9vmk7h_max.jpg", alt: "Описание изображения", shape: { width: 780, height: 640, objectFit: "fill"}, layout: { positioning: "relative", x: 420, y: 220, align: "center", zIndex: 2} }
+                    { id: "title", type: "text", role: "title", value: "Текст", text: { fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center"}, layout: { positioning: "relative", x: 160, y: 80, align: "center", zIndex: 2} },
+                    { id: "image", type: "image", role: "main_image", src: "https://static.1000.menu/img/content-v2/97/7b/36007/prostoi-i-vkusnyi-shokoladnyi-tort_1762166750_0_w9vmk7h_max.jpg", alt: "Описание изображения", objectFit: "fill", text: {fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center"}, figure: { width: 780, height: 640}, layout: { positioning: "relative", x: 420, y: 220, align: "center", zIndex: 2} }
                 ];
             } else if (kind === "greeting") {
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Поздравляем!", text: { fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 160, y: 120, align: "center", zIndex: 2 } },
-                    { id: "name", type: "text", role: "person_name", value: "ФИО", text: { fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 220, y: 230, align: "center", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: "Повод для праздника", text: { fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 260, y: 520, align: "center", zIndex: 2 } }
+                    { id: "title", type: "text", role: "title", value: "Поздравляем!", text: { fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center"}, layout: { positioning: "relative", x: 160, y: 120, align: "center", zIndex: 2 } },
+                    { id: "name", type: "text", role: "person_name", value: "ФИО", text: { fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center"}, layout: { positioning: "relative", x: 220, y: 230, align: "center", zIndex: 2 } },
+                    { id: "body", type: "text", role: "body", value: "Повод для праздника", text: { fontSize: 40, color: "#ffffff", textAlign: "center"}, layout: { positioning: "relative", x: 260, y: 520, align: "center", zIndex: 2 } }
                 ];
             } else if (kind === "metric") {
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Годовой отчет 2025", text: { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", "fontSize": 64, "fontFamily": "Arial", "fontWeight": 800 }, "layout": { "positioning": "relative", "x": 160, "y": 120, "zIndex": 2 } },
-                    { "id": "metric1", "type": "metric", "chartType": "line", "value": 87, "chart": { "unit": "%", "labels": ["Янв", "Фев", "Мар"], "datasets": [10, 20, 15] }, "text": { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", "fontSize": 48, "fontFamily": "Arial", "fontWeight": 700 }, "shape": { "width": 300, "height": 150, "fit": "contain" }, "layout": { "positioning": "absolute", "x": 810, "y": 340, "zIndex": 2 } },
-                    { "id": "body", "type": "text", "role": "body", "value": "Все молодцы", "text": { "textColor": "#e0e0e0", "textAlign": "center", "verticalAlign": "middle", "fontSize": 42, "fontFamily": "Arial", "fontWeight": 400 }, "layout": { "positioning": "absolute", "x": 220, "y": 540, "zIndex": 2 } }
+                    { id: "title", type: "text", role: "title", value: "Годовой отчет 2025", text: { "color": "#ffffff", "textAlign": "center", "fontSize": 64, "fontFamily": "Arial", "fontWeight": 800 }, "layout": { "positioning": "relative", "x": 160, "y": 120, "zIndex": 2 } },
+                    { "id": "metric1", "type": "metric", "chartType": "line", "value": 87, "chart": { "unit": "%", "labels": ["Янв", "Фев", "Мар"], "datasets": [10, 20, 15] }, "text": { "textColor": "#ffffff", "textAlign": "center", "fontSize": 48, "fontFamily": "Arial", "fontWeight": 700 }, "figure": { "width": 300, "height": 150}, "layout": { "positioning": "absolute", "x": 810, "y": 340, "zIndex": 2 } },
+                    { "id": "body", "type": "text", "role": "body", "value": "Все молодцы", "text": { "textColor": "#e0e0e0", "textAlign": "center", "fontSize": 42, "fontFamily": "Arial", "fontWeight": 400 }, "layout": { "positioning": "absolute", "x": 220, "y": 540, "zIndex": 2 } }
                 ];
             } else if (kind === "announcement") {
                 // announcement
                 els = [
-                    { id: "title", "type": "text", "role": "title", "value": "Заголовок", "text": { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", fontSize: 64, "fontWeight": 800 }, "layout": { "x": 160, "y": 120, "zIndex": 2 } },
-                    { "id": "body", "type": "text", "role": "body", "value": "Текст", "text": { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", "fontSize": 42 }, "layout": { "x": 220, "y": 320, "zIndex": 2 } }
+                    { id: "title", "type": "text", "role": "title", "value": "Заголовок", "text": { "textColor": "#ffffff", "textAlign": "center", fontSize: 64, "fontWeight": 800 }, "layout": { "x": 160, "y": 120, "zIndex": 2 } },
+                    { "id": "body", "type": "text", "role": "body", "value": "Текст", "text": { "textColor": "#ffffff", "textAlign": "center", "fontSize": 42 }, "layout": { "x": 220, "y": 320, "zIndex": 2 } }
                 ];
             }
             return els;
@@ -1146,6 +1217,25 @@
         // ---------------------------------------------
 
 
+
+        const AvailableFonts = [
+            { value: 'Arial, Helvetica, sans-serif', label: 'Arial' },
+            { value: 'Verdana, Geneva, sans-serif', label: 'Verdana' },
+            { value: 'Georgia, serif', label: 'Georgia' },
+            { value: 'Times New Roman, Times, serif', label: 'Times New Roman' },
+            { value: 'Courier New, monospace', label: 'Courier New' },
+            { value: 'Impact, fantasy', label: 'Impact' },
+        ];
+
+        fontForm = document.getElementById("text-font");
+        for (var i = 0; i < AvailableFonts.length; i++) {
+            var opt = document.createElement("option");
+            opt.value = AvailableFonts[i].value;
+            opt.label = AvailableFonts[i].label;
+            fontForm.appendChild(opt);
+        };
+
+
         let redactedElIndex = -1;
 
         function pseudoUpdateRedactor() {
@@ -1160,42 +1250,69 @@
                     });
                     if (this.classList.contains('slide-text')) {
                         document.getElementById("textForm").classList.remove("hidden");
+                        document.getElementById("sharedTextForm").classList.remove("hidden");
                         fillTextFormWithValues(document.getElementById("textForm"), elements[index]);
-                        document.getElementById("text-content").focus();
+                        fillSharedTextFormWithValues(document.getElementById("sharedTextForm"), elements[index]);
                     }
                     else if (this.classList.contains('slide-image-element')) {
                         document.getElementById("imageForm").classList.remove("hidden");
+                        document.getElementById("figureForm").classList.remove("hidden");
+                        document.getElementById("sharedTextForm").classList.remove("hidden");
                         fillImageFormWithValues(document.getElementById("imageForm"), elements[index]);
-                        document.getElementById("image-content").focus();
+                        fillFigureFormWithValues(document.getElementById("figureForm"), elements[index]);
+                        fillSharedTextFormWithValues(document.getElementById("sharedTextForm"), elements[index]);
                     }
                     else if (this.classList.contains("slide-chart") || this.classList.contains("metric-value")) {
                         document.getElementById("metricForm").classList.remove("hidden");
+                        if (this.classList.contains("slide-chart")) {
+                            document.getElementById("figureForm").classList.remove("hidden");
+                            fillFigureFormWithValues(document.getElementById("figureForm"), elements[index]);
+                        }
+                        document.getElementById("textForm").classList.remove("hidden");
                         fillMetricFormWithValues(document.getElementById("metricForm"), elements[index]);
+                        fillSharedTextFormWithValues(document.getElementById("sharedTextForm"), elements[index]);
                     };
-
                 });
             });
         };
 
-        function fillTextFormWithValues(textform, element) {
-            textform.querySelector("#text-content").value = element.value;
-            textform.querySelector("#text-size").value = element.text.fontSize;
-            textform.querySelector("#text-color").value = element.text.color;
+        function fillTextFormWithValues(textForm, element) {
+            textForm.querySelector("#text-content").value = element.value;
         }
 
-        function fillImageFormWithValues(imageform, element) {
-            imageform.querySelector("#image-content").value = element.src;
-            imageform.querySelector("#image-replacement").value = element.alt;
+        function fillSharedTextFormWithValues(sharedTextForm, element) {
+            sharedTextForm.querySelector("#text-size").value = element.text.fontSize;
+            sharedTextForm.querySelector("#text-font").value = element.text.fontFamily;
+            sharedTextForm.querySelector("#text-weight").value = element.text.fontWeight;
+            sharedTextForm.querySelector("#text-color").value = element.text.color;
+            sharedTextForm.querySelector("input[name='text-align']").value = element.text.textAlign;
         }
 
-        function fillMetricFormWithValues(metricform, element) {
-            if (element.type === "metric") {
-                metricform.querySelector("#image-content").value = "metric";
-            } else if (element.type === "clart" && element.chartType === "bar") {
-                metricform.querySelector("#image-content").value = "chart-bar";
+        function fillImageFormWithValues(imageForm, element) {
+            imageForm.querySelector("#image-content").value = element.src;
+            imageForm.querySelector("#image-replacement").value = element.alt;
+            imageForm.querySelector("input[name='object-fit']").value = element.fit;
+        }
+
+        function fillFigureFormWithValues(figureForm, element) {
+            figureForm.querySelector("#figure-width").value = element.figure.width;
+            figureForm.querySelector("#figure-height").value = element.figure.height;
+        }
+
+        function fillMetricFormWithValues(metricForm, element) {
+            if (element.chartType === "value") {
+                metricForm.querySelector("#metric-rendering").value = "metric";
+            } else if (element.chartType === "bar") {
+                metricForm.querySelector("#metric-rendering").value = "chart-bar";
             } else {
-                metricform.querySelector("#image-content").value = "chart-line";
+                metricForm.querySelector("#metric-rendering").value = "chart-line";
             }
+            metricForm.querySelector("#metric-color").value = element.color;
+        }
+
+        function fillShapeFormWithValues(shapeForm, element) {
+            shapeForm.querySelector("#shape-subtype") = element.subtype;
+            shapeForm.querySelector("#shape-color").value = element.color;
         }
 
         document.getElementById("textForm").addEventListener('submit', async function (e) {
