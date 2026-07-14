@@ -1,3 +1,4 @@
+
 "use strict";
 
 const VIRTUAL_CANVAS_WIDTH = 1920;

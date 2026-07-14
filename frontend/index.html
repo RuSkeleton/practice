@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -213,7 +214,7 @@
             <h1>Код экрана</h1>
             <p>Введите 3-значный код, выданный HR. После первой привязки экран сможет работать из локального кэша.</p>
             <div class="code-row">
-                <input id="codeInput" maxlength="3" placeholder="000" inputmode="numeric" autocomplete="off" autofocus />
+                <input id="codeInput" maxlength="6" placeholder="000000" inputmode="numeric" autocomplete="off" autofocus />
                 <button id="codeSubmitBtn">Подключить</button>
             </div>
             <div id="codeStatus"></div>
@@ -260,6 +261,7 @@
             FULL_SYNC_EXPIRY_THRESHOLD_MS: 12 * 60 * 60 * 1000,
             RECONNECT_DELAY_MS: 5000,
             SCREEN_CODE_KEY: "digital_signage_screen_code",
+            SCREEN_TOKEN_KEY: "digital_signage_screen_token",
             SERVER_OFFSET_KEY: "digital_signage_server_offset_ms",
             CACHE_PREFIX: "digital_signage_screen_client_v3",
             IMAGE_CACHE_NAME: "digital_signage_images_v2"
@@ -268,6 +270,7 @@
 
         const ENDPOINTS = Object.freeze({
             activate: () => "/screens/activate",
+            screenMe: () => "/screen/me",
             fullSchedule: code => "/screens/" + encodeURIComponent(code) + "/schedule?mode=full&days=" + CONFIG.SCHEDULE_DAYS,
             patchSchedule: (code, from, to, baseVersion) => {
                 const params = new URLSearchParams({
@@ -342,6 +345,7 @@
 
         const state = {
             screenCode: localStorage.getItem(CONFIG.SCREEN_CODE_KEY) || "",
+            screenToken: localStorage.getItem(CONFIG.SCREEN_TOKEN_KEY) || "",
             serverOnline: false,
             schedule: null,
             scheduleVersion: 0,
@@ -387,7 +391,7 @@
             bindGlobalUiEvents();
             readCacheIntoState();
 
-            if (state.screenCode) {
+            if (state.screenCode && state.screenToken) {
                 enterPlayerMode();
                 if (hasDisplayData()) renderCurrentSlide(true);
                 else showLoading("Загрузка расписания", "Получение данных с сервера");
@@ -409,8 +413,8 @@
             });
 
             DOM.codeInput.addEventListener("input", () => {
-                DOM.codeInput.value = DOM.codeInput.value.replace(/\D/g, "").slice(0, 3);
-                if (DOM.codeInput.value.length === 3) window.setTimeout(() => DOM.codeSubmitBtn.click(), 150);
+                DOM.codeInput.value = DOM.codeInput.value.replace(/\D/g, "").slice(0, 6);
+                if (DOM.codeInput.value.length === 6) window.setTimeout(() => DOM.codeSubmitBtn.click(), 150);
             });
             DOM.codeInput.addEventListener("keydown", event => {
                 if (event.key === "Enter") DOM.codeSubmitBtn.click();
@@ -423,8 +427,8 @@
             startPlayerLoop();
             startRefreshLoop();
 
-            const activated = await tryActivateStoredScreen();
-            if (activated) {
+            const authenticated = await tryAuthenticateStoredScreen();
+            if (authenticated) {
                 connectWebSocket();
                 await loadFullSchedule({ silent: hasDisplayData(), reason: "startup" });
             } else if (hasDisplayData()) {
@@ -460,8 +464,8 @@
 
         async function handleActivationSubmit() {
             const code = DOM.codeInput.value.trim();
-            if (!/^\d{3}$/.test(code)) {
-                setCodeStatus("Введите ровно 3 цифры", "error");
+            if (!/^\d{6}$/.test(code)) {
+                setCodeStatus("Введите ровно 6 цифр", "error");
                 return;
             }
 
@@ -469,9 +473,12 @@
             setCodeStatus("Проверка кода...", "");
 
             try {
-                await activateScreen(code);
+                const activation = await activateScreen(code);
                 state.screenCode = code;
+                state.screenToken = String(activation.screen_token || "");
+                if (!state.screenToken) throw new Error("Сервер не выдал токен экрана");
                 localStorage.setItem(CONFIG.SCREEN_CODE_KEY, code);
+                localStorage.setItem(CONFIG.SCREEN_TOKEN_KEY, state.screenToken);
                 resetRuntimeData();
                 setCodeStatus("Экран подключён", "success");
                 window.setTimeout(() => {
@@ -485,13 +492,14 @@
             }
         }
 
-        async function tryActivateStoredScreen() {
-            if (!state.screenCode) return false;
+        async function tryAuthenticateStoredScreen() {
+            if (!state.screenCode || !state.screenToken) return false;
             try {
-                await activateScreen(state.screenCode);
+                const response = await requestJson(ENDPOINTS.screenMe());
+                syncClockFromPayload(response.data);
                 return true;
             } catch (error) {
-                if (error.status === 403 || error.status === 404) {
+                if (error.status === 401 || error.status === 403) {
                     clearStoredScreenCode();
                     showCodeScreen();
                 }
@@ -511,9 +519,19 @@
         }
 
         function clearStoredScreenCode() {
+            const previousCode = state.screenCode;
             stopConnection();
             localStorage.removeItem(CONFIG.SCREEN_CODE_KEY);
+            localStorage.removeItem(CONFIG.SCREEN_TOKEN_KEY);
+            if (previousCode) {
+                localStorage.removeItem(CONFIG.CACHE_PREFIX + ":" + previousCode + ":schedule");
+                localStorage.removeItem(CONFIG.CACHE_PREFIX + ":" + previousCode + ":slides");
+            }
+            if ("caches" in window) {
+                caches.delete(CONFIG.IMAGE_CACHE_NAME).catch(() => {});
+            }
             state.screenCode = "";
+            state.screenToken = "";
             resetRuntimeData();
         }
 
@@ -554,6 +572,7 @@
                 sendWebSocketMessage({
                     type: "register",
                     code: state.screenCode,
+                    screen_token: state.screenToken,
                     client_time: new Date().toISOString(),
                     cached_schedule_version: state.scheduleVersion || 0
                 });
@@ -688,13 +707,18 @@
 
         async function requestJson(path, options = {}) {
             const startedAt = Date.now();
+            const requestHeaders = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                ...(options.headers || {})
+            };
+            if (state.screenToken && path !== ENDPOINTS.activate()) {
+                requestHeaders["X-Screen-Token"] = state.screenToken;
+            }
+
             const response = await fetch(CONFIG.API_BASE + path, {
                 method: options.method || "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    ...(options.headers || {})
-                },
+                headers: requestHeaders,
                 body: options.body,
                 cache: "no-store"
             });

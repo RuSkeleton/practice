@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -388,7 +389,7 @@
                     <div class="form-group">
                         <label>Код доступа (3 цифры)</label>
                         <div style="display: flex; gap: 10px;">
-                            <input id="screenCode" placeholder="000" maxlength="3" style="flex: 1;" />
+                            <input id="screenCode" placeholder="000000" maxlength="6" style="flex: 1;" />
                             <button type="button" id="generateCodeBtn" class="btn-secondary" style="display:inline-block !important; visibility:visible !important; opacity:1 !important;">Сгенерировать</button>
                         </div>
                     </div>
@@ -479,6 +480,18 @@
         "use strict";
 
         const API_BASE = window.location.origin + '/api';
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
         const TOKEN_KEY = 'access_token';
 
         // Новая версия хранит JWT только до закрытия окна браузера. Старый token
@@ -657,16 +670,19 @@
             const kindMap = { announcement: 'Объявление', image: 'Изображение', greeting: 'Поздравление', metric: 'Показатель' };
             container.innerHTML = slides.map(s => {
                 const active = s.is_active && new Date(s.start_date) <= new Date() && new Date(s.end_date) >= new Date();
+                const safeName = escapeHtml(s.name || '(без названия)');
+                const safeKind = escapeHtml(kindMap[s.kind] || s.kind || '');
+                const interval = s.frequency_mode === 4 ? ' (интервал ' + Number(s.hard_interval) + ')' : '';
                 return '<div class="slide-item" style="border-left-color: ' + (active ? '#27ae60' : '#6a7a9a') + '">' +
                     '<div class="slide-info">' +
-                    '<div>' + (s.name || '(без названия)') + '</div>' +
+                    '<div>' + safeName + '</div>' +
                     '<div style="font-size:12px;color:#6a7a9a;">' +
-                    (kindMap[s.kind] || s.kind) +
+                    safeKind +
                     (active ? ' Активен' : ' Неактивен') +
-                    (s.frequency_mode === 4 ? ' (интервал '+s.hard_interval+')' : '') +
-                    ' ' + new Date(s.start_date).toLocaleDateString() + ' -> ' + new Date(s.end_date).toLocaleDateString() +
+                    interval +
+                    ' ' + new Date(s.start_date).toLocaleDateString() + ' → ' + new Date(s.end_date).toLocaleDateString() +
                     '</div></div>' +
-                    '<button class="delete-btn" onclick="deleteSlide(' + s.id + ')">Удалить</button></div>';
+                    '<button class="delete-btn" onclick="deleteSlide(' + Number(s.id) + ')">Удалить</button></div>';
             }).join('');
         }
 
@@ -703,7 +719,7 @@
                     document.getElementById('screenCode').value = data.code || '';
                 } catch (error) {
                     console.error('Ошибка генерации кода:', error);
-                    document.getElementById('screenCode').value = '000';
+                    document.getElementById('screenCode').value = '';
                 }
             });
         }
@@ -711,8 +727,8 @@
         if (addBtn) {
             addBtn.addEventListener('click', async function() {
                 const code = document.getElementById('screenCode').value;
-                if (!code || code.length !== 3 || !/^\d{3}$/.test(code)) {
-                    showScreenMessage('Введите 3 цифры', 'error');
+                if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+                    showScreenMessage('Введите 6 цифр', 'error');
                     return;
                 }
                 const data = {
@@ -771,19 +787,25 @@
                 return;
             }
             container.innerHTML = screens.map(function(s) {
+                const pairedText = s.is_paired ? 'Привязан' : 'Ожидает привязки';
+                const expiryText = s.pairing_expires_at
+                    ? 'Код действует до ' + new Date(s.pairing_expires_at).toLocaleString()
+                    : '';
                 return '<div class="screen-item">' +
                     '<div class="screen-info">' +
                     '<div class="screen-header">' +
-                    '<span class="screen-name">' + (s.name || 'Без названия') + '</span>' +
-                    '<span class="screen-code">' + s.code + '</span>' +
+                    '<span class="screen-name">' + escapeHtml(s.name || 'Без названия') + '</span>' +
+                    '<span class="screen-code">' + escapeHtml(s.code) + '</span>' +
                     '<span class="screen-status ' + (s.is_online ? 'online' : 'offline') + '">' + (s.is_online ? 'Онлайн' : 'Оффлайн') + '</span>' +
-                    (s.is_connected ? 'Подключён' : 'Ожидает') +
+                    escapeHtml(s.is_connected ? ' Разрешён' : ' Отключён') +
                     '</div>' +
-                    (s.location ? '<div class="screen-meta">' + s.location + '</div>' : '') +
+                    '<div class="screen-meta">' + escapeHtml(pairedText + (expiryText ? ' • ' + expiryText : '')) + '</div>' +
+                    (s.location ? '<div class="screen-meta">' + escapeHtml(s.location) + '</div>' : '') +
                     '</div>' +
                     '<div class="screen-actions">' +
-                    (!s.is_connected ? '<button class="btn-connect" onclick="connectScreen(' + s.id + ')">Подключить</button>' : '<button class="btn-disconnect" onclick="disconnectScreen(' + s.id + ')">Отключить</button>') +
-                    '<button class="delete-btn" onclick="deleteScreen(' + s.id + ')">Удалить</button>' +
+                    (!s.is_connected ? '<button class="btn-connect" onclick="connectScreen(' + Number(s.id) + ')">Разрешить</button>' : '<button class="btn-disconnect" onclick="disconnectScreen(' + Number(s.id) + ')">Отключить</button>') +
+                    '<button class="btn-secondary" onclick="resetScreenPairing(' + Number(s.id) + ')">Новый код</button>' +
+                    '<button class="delete-btn" onclick="deleteScreen(' + Number(s.id) + ')">Удалить</button>' +
                     '</div></div>';
             }).join('');
         }
@@ -807,6 +829,29 @@
                 });
                 loadScreens();
             } catch {}
+        }
+
+        async function resetScreenPairing(id) {
+            if (!confirm('Отозвать старый токен экрана и выдать новый код привязки?')) return;
+            try {
+                const response = await fetch(API_BASE + '/screens/' + id + '/reset-pairing', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (response.status === 401) {
+                    clearAuthAndRedirect();
+                    return;
+                }
+                const data = await response.json();
+                if (!response.ok) {
+                    showScreenMessage('Ошибка: ' + (data.detail || 'Не удалось перевыпустить код'), 'error');
+                    return;
+                }
+                showScreenMessage('Новый код: ' + data.code, 'success');
+                loadScreens();
+            } catch {
+                showScreenMessage('Ошибка подключения к серверу', 'error');
+            }
         }
 
         async function deleteScreen(id) {
@@ -853,15 +898,15 @@
             container.innerHTML = users.map(u => `
                 <div class="slide-item" style="border-left-color: ${u.is_active ? '#27ae60' : '#6a7a9a'};">
                     <div class="slide-info">
-                        <div><strong>${u.username}</strong> (${u.full_name || '—'})</div>
+                        <div><strong>${escapeHtml(u.username)}</strong> (${escapeHtml(u.full_name || '—')})</div>
                         <div style="font-size:12px;color:#6a7a9a;">
-                            ${u.email || 'Нет email'} • Роль: ${u.role}
+                            ${escapeHtml(u.email || 'Нет email')} • Роль: ${escapeHtml(u.role)}
                             ${u.is_active ? 'Активен' : 'Неактивен'}
                         </div>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button class="btn-secondary" onclick="editUser(${u.id})">✎</button>
-                        <button class="delete-btn" onclick="deleteUser(${u.id})">Удалить</button>
+                        <button class="btn-secondary" onclick="editUser(${Number(u.id)})">✎</button>
+                        <button class="delete-btn" onclick="deleteUser(${Number(u.id)})">Удалить</button>
                     </div>
                 </div>
             `).join('');

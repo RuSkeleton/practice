@@ -1,3 +1,4 @@
+
 """Печатает случайный JWT-секрет, пригодный для production .env."""
 
 import secrets

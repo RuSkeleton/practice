@@ -1,3 +1,4 @@
+
 """Создание первого администратора и dev-учётных записей.
 
 Bootstrap выполняется во время запуска FastAPI, но только после того, как схема
@@ -61,6 +62,7 @@ def _create_or_update_dev_user(
         user.is_active = True
         if config.DEV_BOOTSTRAP_RESET_PASSWORDS:
             user.password_hash = auth.get_password_hash(password)
+            user.auth_version = int(user.auth_version or 1) + 1
 
     db.commit()
 

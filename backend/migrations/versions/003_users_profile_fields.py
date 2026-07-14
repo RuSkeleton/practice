@@ -1,3 +1,4 @@
+
 """Add user profile and status fields.
 
 Revision ID: 003_users_profile_fields

@@ -1,3 +1,4 @@
+
 """Операции чтения и изменения сущностей через SQLAlchemy."""
 
 from __future__ import annotations
@@ -198,6 +199,7 @@ def update_user(
             allow_unsafe_dev_password=allow_unsafe_dev_password,
         )
         db_user.password_hash = auth.get_password_hash(user_data.password)
+        db_user.auth_version = int(db_user.auth_version or 1) + 1
 
     db.commit()
     db.refresh(db_user)

@@ -1,3 +1,4 @@
+
 """Alembic environment.
 
 Ключевое изменение: Alembic и FastAPI читают один DATABASE_URL из

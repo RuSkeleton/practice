@@ -1,10 +1,12 @@
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from backend import crud, schemas
+from backend.auth import require_hr_or_admin
 from backend.database import get_db
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_hr_or_admin)])
 
 @router.get("/slides/active", response_model=List[schemas.SlideOut])
 def get_active_slides(db: Session = Depends(get_db)):

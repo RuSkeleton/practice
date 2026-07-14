@@ -1,3 +1,4 @@
+
 """Конфигурация приложения и проверки безопасности при запуске.
 
 Главный принцип этого файла: опасная конфигурация должна обнаруживаться сразу,
@@ -146,14 +147,54 @@ class Config:
             raise RuntimeError("PASSWORD_MIN_LENGTH cannot be less than 8")
         self.PASSWORD_REQUIRE_MIXED = _env_bool("PASSWORD_REQUIRE_MIXED", True)
 
+        # Ограничение перебора публичной формы входа. Состояние хранится в памяти
+        # одного процесса, что соответствует текущему single-server deployment.
+        self.LOGIN_MAX_FAILED_ATTEMPTS_PER_ACCOUNT = int(
+            os.getenv("LOGIN_MAX_FAILED_ATTEMPTS_PER_ACCOUNT", "5")
+        )
+        self.LOGIN_MAX_FAILED_ATTEMPTS_PER_IP = int(
+            os.getenv("LOGIN_MAX_FAILED_ATTEMPTS_PER_IP", "20")
+        )
+        self.LOGIN_RATE_LIMIT_WINDOW_SECONDS = int(
+            os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "300")
+        )
+
+        # Код экрана больше не является постоянным секретом. Это короткоживущий
+        # одноразовый pairing code, который обменивается на случайный device token.
+        self.SCREEN_PAIRING_CODE_LENGTH = int(
+            os.getenv("SCREEN_PAIRING_CODE_LENGTH", "6")
+        )
+        self.SCREEN_PAIRING_TTL_MINUTES = int(
+            os.getenv("SCREEN_PAIRING_TTL_MINUTES", "15")
+        )
+        self.SCREEN_TOKEN_BYTES = int(os.getenv("SCREEN_TOKEN_BYTES", "32"))
+        self.SCREEN_ACTIVATION_MAX_FAILED_ATTEMPTS_PER_IP = int(
+            os.getenv("SCREEN_ACTIVATION_MAX_FAILED_ATTEMPTS_PER_IP", "10")
+        )
+        self.SCREEN_ACTIVATION_RATE_LIMIT_WINDOW_SECONDS = int(
+            os.getenv("SCREEN_ACTIVATION_RATE_LIMIT_WINDOW_SECONDS", "300")
+        )
+
+        if self.SCREEN_PAIRING_CODE_LENGTH != 6:
+            raise RuntimeError("SCREEN_PAIRING_CODE_LENGTH must be exactly 6")
+        if self.SCREEN_PAIRING_TTL_MINUTES <= 0:
+            raise RuntimeError("SCREEN_PAIRING_TTL_MINUTES must be greater than zero")
+        if self.SCREEN_TOKEN_BYTES < 32:
+            raise RuntimeError("SCREEN_TOKEN_BYTES cannot be less than 32")
+        if min(
+            self.LOGIN_MAX_FAILED_ATTEMPTS_PER_ACCOUNT,
+            self.LOGIN_MAX_FAILED_ATTEMPTS_PER_IP,
+            self.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+            self.SCREEN_ACTIVATION_MAX_FAILED_ATTEMPTS_PER_IP,
+            self.SCREEN_ACTIVATION_RATE_LIMIT_WINDOW_SECONDS,
+        ) <= 0:
+            raise RuntimeError("Rate limit values must be greater than zero")
+
         # Dev-функции выключены по умолчанию даже в development. Их нужно
         # включить явно в .env.development.example.
         self.ENABLE_DEV_BOOTSTRAP = _env_bool("ENABLE_DEV_BOOTSTRAP", False)
         self.DEV_BOOTSTRAP_RESET_PASSWORDS = _env_bool(
             "DEV_BOOTSTRAP_RESET_PASSWORDS", False
-        )
-        self.ENABLE_PUBLIC_REGISTER_IN_DEV = _env_bool(
-            "ENABLE_PUBLIC_REGISTER_IN_DEV", False
         )
         self.SHOW_DEV_LOGIN_HINTS = _env_bool("SHOW_DEV_LOGIN_HINTS", False)
 
@@ -161,7 +202,6 @@ class Config:
             {
                 self.ENABLE_DEV_BOOTSTRAP,
                 self.DEV_BOOTSTRAP_RESET_PASSWORDS,
-                self.ENABLE_PUBLIC_REGISTER_IN_DEV,
                 self.SHOW_DEV_LOGIN_HINTS,
             }
         ):
