@@ -1,64 +1,639 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор слайда</title>
+    <style>
+        :root {
+            --panel: #ffffff;
+            --border: #d9dee8;
+            --muted: #687386;
+            --accent: #315efb;
+            --danger: #c73535;
+            --workspace: #e9edf3;
+        }
 
-    <title>Редактор слайдов</title>
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            color: #182033;
+            background: var(--workspace);
+            overflow: hidden;
+        }
 
-    <link
-        rel="stylesheet"
-        href="/static/css/editor.css"
-    >
+        button, input, select, textarea { font: inherit; }
+        button { cursor: pointer; }
+
+        .editor {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr) 280px;
+            grid-template-rows: 64px minmax(0, 1fr);
+            height: 100vh;
+        }
+
+        .topbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .topbar h1 {
+            margin: 0;
+            font-size: 18px;
+            white-space: nowrap;
+        }
+
+        .topbar .spacer { flex: 1; }
+        .status { color: var(--muted); font-size: 13px; }
+
+        .btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 8px;
+            padding: 9px 12px;
+        }
+
+        .btn:hover { background: #f6f8fc; }
+        .btn-primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+        .btn-primary:hover { background: #244bd8; }
+        .btn-danger { color: var(--danger); }
+
+        .sidebar {
+            background: var(--panel);
+            overflow: auto;
+            padding: 14px;
+        }
+
+        .sidebar-left { border-right: 1px solid var(--border); }
+        .sidebar-right { border-left: 1px solid var(--border); }
+
+        .section { margin-bottom: 20px; }
+        .section h2 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: var(--muted);
+        }
+
+        .stack { display: grid; gap: 8px; }
+        .tool-button { width: 100%; text-align: left; }
+
+        .workspace {
+            min-width: 0;
+            min-height: 0;
+            display: grid;
+            place-items: center;
+            overflow: auto;
+            padding: 28px;
+        }
+
+        .canvas-shell {
+            position: relative;
+            width: min(100%, calc((100vh - 120px) * 16 / 9));
+            aspect-ratio: 16 / 9;
+            background: #111827;
+            box-shadow: 0 14px 40px rgba(20, 31, 55, .22);
+        }
+
+        .canvas {
+            position: absolute;
+            inset: 0;
+            width: 1920px;
+            height: 1080px;
+            transform-origin: top left;
+            overflow: hidden;
+            background: #07111f;
+        }
+
+        .canvas-element {
+            position: absolute;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .canvas-element.selected {
+            outline: 5px solid #315efb;
+            outline-offset: 2px;
+        }
+
+        .canvas-element.text,
+        .canvas-element.badge {
+            display: flex;
+            align-items: center;
+            white-space: pre-wrap;
+        }
+
+        .canvas-element.image img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-element.chart {
+            display: grid;
+            place-items: center;
+            background: rgba(255, 255, 255, .12);
+            color: #fff;
+            border: 2px dashed rgba(255, 255, 255, .5);
+            font-size: 42px;
+        }
+
+        .field { display: grid; gap: 5px; margin-bottom: 10px; }
+        .field label { font-size: 12px; color: var(--muted); }
+        .field input, .field select, .field textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 8px;
+            background: #fff;
+        }
+        .field textarea { min-height: 80px; resize: vertical; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .empty-note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+        .hidden { display: none !important; }
+    </style>
 </head>
-
 <body>
-    <div class="editor-layout">
-        <header class="editor-topbar">
-            <div class="topbar-zone"></div>
-            <div class="topbar-zone"></div>
-            <div class="topbar-zone"></div>
-        </header>
+<div class="editor">
+    <header class="topbar">
+        <button class="btn" id="backButton" type="button">← К слайдам</button>
+        <h1 id="pageTitle">Новый слайд</h1>
+        <span class="status" id="statusText">Готово</span>
+        <div class="spacer"></div>
+        <button class="btn" id="previewButton" type="button">Предпросмотр</button>
+        <button class="btn btn-primary" id="saveButton" type="button">Сохранить</button>
+    </header>
 
-        <aside class="editor-leftbar">
-            <div class="leftbar-tabs"></div>
-            <div class="leftbar-main"></div>
-            <div class="leftbar-footer"></div>
-        </aside>
+    <aside class="sidebar sidebar-left">
+        <section class="section">
+            <h2>Элементы</h2>
+            <div class="stack">
+                <button class="btn tool-button" data-add="text" type="button">+ Текст</button>
+                <button class="btn tool-button" data-add="image" type="button">+ Изображение</button>
+                <button class="btn tool-button" data-add="badge" type="button">+ Бейдж</button>
+                <button class="btn tool-button" data-add="chart" type="button">+ График</button>
+            </div>
+        </section>
 
-        <main class="editor-workspace">
-            <div class="editor-stage">
-                <div class="editor-canvas-shell">
-                    <section
-                        id="editor-canvas"
-                        class="editor-canvas"
-                    >
-                        <div class="editor-canvas-safe-zone"></div>
-                    </section>
+        <section class="section">
+            <h2>Слайд</h2>
+            <div class="field">
+                <label for="slideName">Название</label>
+                <input id="slideName" maxlength="200" value="Новый слайд">
+            </div>
+            <div class="field">
+                <label for="slideKind">Тип</label>
+                <select id="slideKind">
+                    <option value="announcement">Объявление</option>
+                    <option value="image">Изображение</option>
+                    <option value="congratulation">Поздравление</option>
+                    <option value="metric">Показатель</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="backgroundType">Фон</label>
+                <select id="backgroundType">
+                    <option value="color">Цвет</option>
+                    <option value="gradient">Градиент</option>
+                    <option value="image">Изображение</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="backgroundValue">Значение фона</label>
+                <input id="backgroundValue" value="#07111f">
+            </div>
+        </section>
+    </aside>
+
+    <main class="workspace" id="workspace">
+        <div class="canvas-shell" id="canvasShell">
+            <section class="canvas" id="canvas" aria-label="Холст слайда 1920 на 1080"></section>
+        </div>
+    </main>
+
+    <aside class="sidebar sidebar-right">
+        <section class="section">
+            <h2>Свойства элемента</h2>
+            <p class="empty-note" id="noSelection">Выбери элемент на холсте.</p>
+
+            <div id="properties" class="hidden">
+                <div class="field">
+                    <label for="elementValue">Содержимое / URL</label>
+                    <textarea id="elementValue"></textarea>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field"><label for="elementX">X</label><input id="elementX" type="number"></div>
+                    <div class="field"><label for="elementY">Y</label><input id="elementY" type="number"></div>
+                    <div class="field"><label for="elementWidth">Ширина</label><input id="elementWidth" type="number" min="1"></div>
+                    <div class="field"><label for="elementHeight">Высота</label><input id="elementHeight" type="number" min="1"></div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field"><label for="elementFontSize">Шрифт</label><input id="elementFontSize" type="number" min="1"></div>
+                    <div class="field"><label for="elementColor">Цвет</label><input id="elementColor" type="color"></div>
+                </div>
+
+                <div class="field">
+                    <label for="elementAlign">Выравнивание</label>
+                    <select id="elementAlign">
+                        <option value="left">Слева</option>
+                        <option value="center">По центру</option>
+                        <option value="right">Справа</option>
+                    </select>
+                </div>
+
+                <div class="stack">
+                    <button class="btn" id="duplicateButton" type="button">Дублировать</button>
+                    <button class="btn btn-danger" id="deleteButton" type="button">Удалить элемент</button>
                 </div>
             </div>
-        </main>
+        </section>
+    </aside>
+</div>
 
-        <aside class="editor-rightbar">
-            <div class="rightbar-header"></div>
-            <div class="rightbar-main"></div>
-            <div class="rightbar-footer"></div>
-        </aside>
+<script>
+(() => {
+    'use strict';
 
-        <footer class="editor-bottombar">
-            <div class="bottombar-zone"></div>
-            <div class="bottombar-zone"></div>
-            <div class="bottombar-zone"></div>
-        </footer>
-    </div>
+    const API_BASE = '/api';
+    const TOKEN_KEY = 'access_token';
+    const slideId = new URLSearchParams(location.search).get('id');
 
-    <script
-        src="/static/js/editor.js"
-        defer
-    ></script>
+    const state = {
+        slide: createEmptySlide(),
+        selectedElementId: null,
+        preview: false
+    };
+
+    const refs = {
+        canvas: document.getElementById('canvas'),
+        canvasShell: document.getElementById('canvasShell'),
+        workspace: document.getElementById('workspace'),
+        pageTitle: document.getElementById('pageTitle'),
+        statusText: document.getElementById('statusText'),
+        saveButton: document.getElementById('saveButton'),
+        previewButton: document.getElementById('previewButton'),
+        slideName: document.getElementById('slideName'),
+        slideKind: document.getElementById('slideKind'),
+        backgroundType: document.getElementById('backgroundType'),
+        backgroundValue: document.getElementById('backgroundValue'),
+        noSelection: document.getElementById('noSelection'),
+        properties: document.getElementById('properties'),
+        elementValue: document.getElementById('elementValue'),
+        elementX: document.getElementById('elementX'),
+        elementY: document.getElementById('elementY'),
+        elementWidth: document.getElementById('elementWidth'),
+        elementHeight: document.getElementById('elementHeight'),
+        elementFontSize: document.getElementById('elementFontSize'),
+        elementColor: document.getElementById('elementColor'),
+        elementAlign: document.getElementById('elementAlign')
+    };
+
+    function createEmptySlide() {
+        const start = new Date();
+        const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return {
+            name: 'Новый слайд',
+            template_key: null,
+            kind: 'announcement',
+            start_date: start.toISOString(),
+            end_date: end.toISOString(),
+            is_active: true,
+            duration_slots: 1,
+            frequency_mode: 1,
+            hard_interval: null,
+            is_emergency: false,
+            alarm_type: null,
+            background: { type: 'color', value: '#07111f' },
+            elements: []
+        };
+    }
+
+    async function apiFetch(path, options = {}) {
+        const token = sessionStorage.getItem(TOKEN_KEY);
+        if (!token) {
+            location.href = '/';
+            throw new Error('Требуется авторизация');
+        }
+
+        const headers = new Headers(options.headers || {});
+        headers.set('Authorization', 'Bearer ' + token);
+        if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+            headers.set('Content-Type', 'application/json');
+        }
+
+        const response = await fetch(API_BASE + path, { ...options, headers });
+        if (response.status === 401) {
+            sessionStorage.removeItem(TOKEN_KEY);
+            location.href = '/';
+            throw new Error('Сессия истекла');
+        }
+        if (!response.ok) {
+            let message = 'Ошибка запроса';
+            try {
+                const data = await response.json();
+                message = data.detail || data.message || message;
+            } catch (_) {}
+            throw new Error(message);
+        }
+        return response.status === 204 ? null : response.json();
+    }
+
+    async function loadSlide() {
+        if (!slideId) {
+            syncSlideControls();
+            render();
+            return;
+        }
+
+        setStatus('Загрузка…');
+        try {
+            state.slide = await apiFetch('/slides/' + encodeURIComponent(slideId));
+            refs.pageTitle.textContent = 'Редактирование: ' + state.slide.name;
+            syncSlideControls();
+            render();
+            setStatus('Загружено');
+        } catch (error) {
+            setStatus(error.message, true);
+        }
+    }
+
+    function addElement(type) {
+        const id = type + '-' + Date.now();
+        const common = { x: 200, y: 180, width: 700, height: 160, zIndex: nextZIndex() };
+        let element;
+
+        if (type === 'image') {
+            element = {
+                id, type: 'image', role: 'main_image', src: '', alt: '',
+                layout: { ...common, width: 560, height: 360, objectFit: 'cover' }
+            };
+        } else if (type === 'badge') {
+            element = {
+                id, type: 'badge', role: 'badge', value: 'БЕЙДЖ',
+                layout: { ...common, width: 300, height: 80, fontSize: 34, color: '#ffffff', align: 'center' }
+            };
+        } else if (type === 'chart') {
+            element = {
+                id, type: 'chart', role: 'metric_chart',
+                chart: { chartType: 'bar', labels: ['Пн', 'Вт', 'Ср'], datasets: [{ label: 'Значение', data: [10, 20, 15] }] },
+                layout: { ...common, width: 900, height: 480 }
+            };
+        } else {
+            element = {
+                id, type: 'text', role: 'body', value: 'Новый текст',
+                layout: { ...common, fontSize: 54, fontWeight: 400, color: '#ffffff', align: 'left' }
+            };
+        }
+
+        state.slide.elements.push(element);
+        state.selectedElementId = id;
+        render();
+    }
+
+    function nextZIndex() {
+        return Math.max(0, ...state.slide.elements.map(item => Number(item.layout?.zIndex || 0))) + 1;
+    }
+
+    function render() {
+        renderBackground();
+        refs.canvas.innerHTML = '';
+
+        for (const element of state.slide.elements) {
+            refs.canvas.appendChild(renderElement(element));
+        }
+
+        updateScale();
+        syncProperties();
+    }
+
+    function renderBackground() {
+        const background = state.slide.background || {};
+        refs.canvas.style.backgroundImage = '';
+        refs.canvas.style.backgroundColor = '#07111f';
+
+        if (background.type === 'color') {
+            refs.canvas.style.backgroundColor = background.value || '#07111f';
+        } else if (background.type === 'image') {
+            refs.canvas.style.backgroundImage = `url("${String(background.value || '').replace(/"/g, '\\"')}")`;
+            refs.canvas.style.backgroundSize = 'cover';
+            refs.canvas.style.backgroundPosition = 'center';
+        } else {
+            refs.canvas.style.backgroundImage = gradientValue(background.value);
+        }
+    }
+
+    function gradientValue(value) {
+        const presets = {
+            default: 'linear-gradient(135deg, #07111f, #1f3a5f)',
+            announcement: 'linear-gradient(135deg, #182848, #4b6cb7)',
+            urgent: 'linear-gradient(135deg, #7f1d1d, #dc2626)',
+            congratulations: 'linear-gradient(135deg, #6d28d9, #db2777)',
+            metric: 'linear-gradient(135deg, #064e3b, #0f766e)'
+        };
+        return presets[value] || value || presets.default;
+    }
+
+    function renderElement(element) {
+        const node = document.createElement('div');
+        const layout = element.layout || {};
+        node.className = 'canvas-element ' + element.type;
+        node.dataset.elementId = element.id;
+        node.style.left = Number(layout.x || 0) + 'px';
+        node.style.top = Number(layout.y || 0) + 'px';
+        node.style.width = Number(layout.width || 100) + 'px';
+        node.style.height = Number(layout.height || 100) + 'px';
+        node.style.zIndex = Number(layout.zIndex || 1);
+        node.style.fontSize = Number(layout.fontSize || 40) + 'px';
+        node.style.fontWeight = String(layout.fontWeight || 400);
+        node.style.color = layout.color || '#ffffff';
+        node.style.justifyContent = alignmentToFlex(layout.align);
+        node.style.textAlign = layout.align || 'left';
+
+        if (element.type === 'image') {
+            const image = document.createElement('img');
+            image.src = element.src || '';
+            image.alt = element.alt || '';
+            image.style.objectFit = layout.objectFit || 'cover';
+            node.appendChild(image);
+        } else if (element.type === 'chart') {
+            node.textContent = 'График — настройка будет добавлена';
+        } else {
+            node.textContent = String(element.value || '');
+        }
+
+        if (!state.preview && element.id === state.selectedElementId) node.classList.add('selected');
+        node.addEventListener('click', event => {
+            event.stopPropagation();
+            if (state.preview) return;
+            state.selectedElementId = element.id;
+            render();
+        });
+
+        return node;
+    }
+
+    function alignmentToFlex(value) {
+        if (value === 'center') return 'center';
+        if (value === 'right') return 'flex-end';
+        return 'flex-start';
+    }
+
+    function updateScale() {
+        const scale = refs.canvasShell.clientWidth / 1920;
+        refs.canvas.style.transform = `scale(${scale})`;
+    }
+
+    function selectedElement() {
+        return state.slide.elements.find(item => item.id === state.selectedElementId) || null;
+    }
+
+    function syncSlideControls() {
+        refs.slideName.value = state.slide.name || '';
+        refs.slideKind.value = state.slide.kind || 'announcement';
+        refs.backgroundType.value = state.slide.background?.type || 'color';
+        refs.backgroundValue.value = state.slide.background?.value || '';
+    }
+
+    function syncProperties() {
+        const element = selectedElement();
+        refs.noSelection.classList.toggle('hidden', Boolean(element));
+        refs.properties.classList.toggle('hidden', !element);
+        if (!element) return;
+
+        const layout = element.layout || {};
+        refs.elementValue.value = element.type === 'image' ? (element.src || '') : (element.value || '');
+        refs.elementX.value = Number(layout.x || 0);
+        refs.elementY.value = Number(layout.y || 0);
+        refs.elementWidth.value = Number(layout.width || 100);
+        refs.elementHeight.value = Number(layout.height || 100);
+        refs.elementFontSize.value = Number(layout.fontSize || 40);
+        refs.elementColor.value = normalizeColor(layout.color || '#ffffff');
+        refs.elementAlign.value = layout.align || 'left';
+    }
+
+    function normalizeColor(value) {
+        return /^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff';
+    }
+
+    function updateSelectedFromProperties() {
+        const element = selectedElement();
+        if (!element) return;
+        element.layout ||= {};
+
+        if (element.type === 'image') element.src = refs.elementValue.value.trim();
+        else element.value = refs.elementValue.value;
+
+        element.layout.x = Number(refs.elementX.value || 0);
+        element.layout.y = Number(refs.elementY.value || 0);
+        element.layout.width = Math.max(1, Number(refs.elementWidth.value || 1));
+        element.layout.height = Math.max(1, Number(refs.elementHeight.value || 1));
+        element.layout.fontSize = Math.max(1, Number(refs.elementFontSize.value || 1));
+        element.layout.color = refs.elementColor.value;
+        element.layout.align = refs.elementAlign.value;
+        render();
+    }
+
+    function duplicateSelected() {
+        const element = selectedElement();
+        if (!element) return;
+        const clone = structuredClone(element);
+        clone.id = element.type + '-' + Date.now();
+        clone.layout.x = Number(clone.layout.x || 0) + 40;
+        clone.layout.y = Number(clone.layout.y || 0) + 40;
+        clone.layout.zIndex = nextZIndex();
+        state.slide.elements.push(clone);
+        state.selectedElementId = clone.id;
+        render();
+    }
+
+    function deleteSelected() {
+        if (!state.selectedElementId) return;
+        state.slide.elements = state.slide.elements.filter(item => item.id !== state.selectedElementId);
+        state.selectedElementId = null;
+        render();
+    }
+
+    async function saveSlide() {
+        syncStateFromSlideControls();
+        setStatus('Сохранение…');
+        refs.saveButton.disabled = true;
+        try {
+            const path = slideId ? '/slides/' + encodeURIComponent(slideId) : '/slides';
+            const method = slideId ? 'PUT' : 'POST';
+            const saved = await apiFetch(path, { method, body: JSON.stringify(state.slide) });
+            setStatus('Сохранено');
+            if (!slideId && saved?.id) location.replace('/editor.html?id=' + saved.id);
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            refs.saveButton.disabled = false;
+        }
+    }
+
+    function syncStateFromSlideControls() {
+        state.slide.name = refs.slideName.value.trim() || 'Без названия';
+        state.slide.kind = refs.slideKind.value;
+        state.slide.background = {
+            type: refs.backgroundType.value,
+            value: refs.backgroundValue.value.trim()
+        };
+    }
+
+    function setStatus(text, isError = false) {
+        refs.statusText.textContent = text;
+        refs.statusText.style.color = isError ? '#c73535' : '';
+    }
+
+    function togglePreview() {
+        state.preview = !state.preview;
+        refs.previewButton.textContent = state.preview ? 'Вернуться к редактированию' : 'Предпросмотр';
+        document.querySelector('.sidebar-left').classList.toggle('hidden', state.preview);
+        document.querySelector('.sidebar-right').classList.toggle('hidden', state.preview);
+        document.querySelector('.editor').style.gridTemplateColumns = state.preview ? '1fr' : '220px minmax(0, 1fr) 280px';
+        render();
+    }
+
+    document.querySelectorAll('[data-add]').forEach(button => {
+        button.addEventListener('click', () => addElement(button.dataset.add));
+    });
+
+    refs.canvas.addEventListener('click', () => {
+        if (state.preview) return;
+        state.selectedElementId = null;
+        render();
+    });
+
+    ['input', 'change'].forEach(eventName => {
+        [refs.elementValue, refs.elementX, refs.elementY, refs.elementWidth, refs.elementHeight,
+         refs.elementFontSize, refs.elementColor, refs.elementAlign].forEach(control => {
+            control.addEventListener(eventName, updateSelectedFromProperties);
+        });
+    });
+
+    [refs.slideName, refs.slideKind, refs.backgroundType, refs.backgroundValue].forEach(control => {
+        control.addEventListener('input', () => { syncStateFromSlideControls(); render(); });
+        control.addEventListener('change', () => { syncStateFromSlideControls(); render(); });
+    });
+
+    document.getElementById('duplicateButton').addEventListener('click', duplicateSelected);
+    document.getElementById('deleteButton').addEventListener('click', deleteSelected);
+    document.getElementById('saveButton').addEventListener('click', saveSlide);
+    document.getElementById('previewButton').addEventListener('click', togglePreview);
+    document.getElementById('backButton').addEventListener('click', () => { location.href = '/admin.html'; });
+    window.addEventListener('resize', updateScale);
+
+    loadSlide();
+})();
+</script>
 </body>
 </html>
