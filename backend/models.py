@@ -1,3 +1,4 @@
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -22,6 +23,9 @@ class User(Base):
     full_name = Column(String(100), nullable=True)   # ФИО
     email = Column(String(100), unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
+    # Версия сессии. Увеличивается при смене пароля и немедленно отзывает
+    # все JWT, выданные до изменения учётных данных.
+    auth_version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
     last_login = Column(DateTime, nullable=True)
@@ -91,13 +95,27 @@ class Slide(Base):
 class Screen(Base):
     __tablename__ = "screens"
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(3), unique=True, nullable=False)
+
+    # Короткоживущий одноразовый код привязки. После активации он больше не
+    # подтверждает экран: постоянная аутентификация выполняется device token.
+    code = Column(String(6), unique=True, nullable=False)
+    pairing_expires_at = Column(DateTime, nullable=True)
+
+    # Сырой device token в базе никогда не хранится.
+    device_token_hash = Column(String(64), unique=True, nullable=True)
+    token_created_at = Column(DateTime, nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+
     name = Column(String(100), nullable=True)
     location = Column(String(200), nullable=True)
     is_connected = Column(Boolean, default=False)
     is_online = Column(Boolean, default=False)
     last_active = Column(DateTime, onupdate=func.now())
     created_at = Column(DateTime, server_default=func.now())
+
+    @property
+    def is_paired(self) -> bool:
+        return bool(self.device_token_hash)
 
 class ScheduleWindow(Base):
     __tablename__ = "schedule_windows"

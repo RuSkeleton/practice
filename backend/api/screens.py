@@ -1,13 +1,12 @@
 """Административные маршруты управления экранами.
 
-Маршруты экранного клиента (activate/schedule/slides batch) находятся отдельно
-в ``backend/routers/screens.py``. Такое разделение убирает прежние дубликаты
-``/screens/activate`` и не смешивает права HR с протоколом экранного клиента.
+Все маршруты этого router закрыты для неавторизованных пользователей на уровне
+самого router. Экранный клиент использует отдельный router и отдельный device
+token; пользовательский JWT туда не подставляется.
 """
 
 from __future__ import annotations
 
-import secrets
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -15,11 +14,17 @@ from sqlalchemy.orm import Session
 
 from backend import models, schemas
 from backend.auth import require_hr_or_admin
+from backend.config import config
 from backend.database import get_db
 from backend.routers.websocket import notify_screen_disabled
+from backend.screen_auth import (
+    generate_pairing_code,
+    pairing_expiry_from_now,
+    rotate_screen_credentials,
+)
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_hr_or_admin)])
 
 
 def _get_screen_or_404(db: Session, screen_id: int) -> models.Screen:
@@ -29,23 +34,28 @@ def _get_screen_or_404(db: Session, screen_id: int) -> models.Screen:
     return screen
 
 
-@router.get("/screens/generate-code")
+def _generate_unique_code(db: Session, *, except_screen_id: int | None = None) -> str:
+    query = db.query(models.Screen.code)
+    if except_screen_id is not None:
+        query = query.filter(models.Screen.id != except_screen_id)
+    existing_codes = {row[0] for row in query.all()}
+
+    for _ in range(500):
+        code = generate_pairing_code()
+        if code not in existing_codes:
+            return code
+    raise HTTPException(status_code=503, detail="Не удалось найти свободный код")
+
+
+@router.get("/screens/generate-code", response_model=schemas.ScreenPairingCodeOut)
 def generate_screen_code(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
-    """Генерирует свободный pairing-код.
-
-    ``secrets`` выбран вместо ``random``: он предназначен для значений,
-    связанных с доступом. Пространство из 1000 кодов всё равно мало — это будет
-    заменено на одноразовый pairing + постоянный screen token следующим этапом.
-    """
-    existing_codes = {row[0] for row in db.query(models.Screen.code).all()}
-    for _ in range(200):
-        code = f"{secrets.randbelow(1000):03d}"
-        if code not in existing_codes:
-            return {"code": code}
-    raise HTTPException(status_code=503, detail="Не удалось найти свободный код")
+    """Генерирует 6-значный одноразовый pairing code."""
+    return schemas.ScreenPairingCodeOut(
+        code=_generate_unique_code(db),
+        expires_in_seconds=config.SCREEN_PAIRING_TTL_MINUTES * 60,
+    )
 
 
 @router.post(
@@ -56,7 +66,6 @@ def generate_screen_code(
 def create_screen(
     screen: schemas.ScreenCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
     existing = (
         db.query(models.Screen)
@@ -66,7 +75,13 @@ def create_screen(
     if existing:
         raise HTTPException(status_code=400, detail="Код уже используется")
 
-    db_screen = models.Screen(**screen.model_dump())
+    db_screen = models.Screen(
+        **screen.model_dump(),
+        pairing_expires_at=pairing_expiry_from_now(),
+        device_token_hash=None,
+        token_created_at=None,
+        activated_at=None,
+    )
     db.add(db_screen)
     db.commit()
     db.refresh(db_screen)
@@ -76,9 +91,7 @@ def create_screen(
 @router.get("/screens", response_model=List[schemas.ScreenOut])
 def get_all_screens(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
-    # Viewer не получает список коротких кодов экранов.
     return db.query(models.Screen).order_by(models.Screen.created_at.desc()).all()
 
 
@@ -86,7 +99,6 @@ def get_all_screens(
 def get_screen(
     screen_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
     return _get_screen_or_404(db, screen_id)
 
@@ -96,7 +108,6 @@ def update_screen(
     screen_id: int,
     screen_data: schemas.ScreenUpdate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
     screen = _get_screen_or_404(db, screen_id)
     for key, value in screen_data.model_dump(exclude_unset=True).items():
@@ -111,12 +122,10 @@ def delete_screen(
     screen_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
     screen = _get_screen_or_404(db, screen_id)
     screen_code = screen.code
 
-    # Сначала уведомляем текущий WebSocket, затем удаляем запись.
     background_tasks.add_task(
         notify_screen_disabled,
         screen_code,
@@ -131,12 +140,11 @@ def delete_screen(
 def connect_screen(
     screen_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
     screen = _get_screen_or_404(db, screen_id)
     screen.is_connected = True
     db.commit()
-    return {"ok": True, "message": f"Экран {screen.code} подключён"}
+    return {"ok": True, "message": f"Экран {screen.code} разрешён"}
 
 
 @router.post("/screens/{screen_id}/disconnect")
@@ -144,7 +152,6 @@ def disconnect_screen(
     screen_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_hr_or_admin),
 ):
     screen = _get_screen_or_404(db, screen_id)
     screen.is_connected = False
@@ -157,3 +164,38 @@ def disconnect_screen(
         "Экран отключён администратором",
     )
     return {"ok": True}
+
+
+@router.post(
+    "/screens/{screen_id}/reset-pairing",
+    response_model=schemas.ScreenPairingOut,
+)
+def reset_screen_pairing(
+    screen_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Отзывает старый device token и выдаёт новый pairing code.
+
+    Используется при утрате устройства, передаче экрана в ремонт или подозрении,
+    что токен был скопирован. Старый экран немедленно теряет доступ.
+    """
+    screen = _get_screen_or_404(db, screen_id)
+    old_code = screen.code
+
+    background_tasks.add_task(
+        notify_screen_disabled,
+        old_code,
+        "Учётные данные экрана перевыпущены",
+    )
+
+    try:
+        code = rotate_screen_credentials(db, screen)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return schemas.ScreenPairingOut(
+        screen_id=screen.id,
+        code=code,
+        pairing_expires_at=screen.pairing_expires_at,
+    )

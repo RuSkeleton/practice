@@ -1,5 +1,4 @@
-# backend/api/websocket.py
-# WebSocket для экранов: регистрация, online/offline, ping/pong, уведомления.
+"""WebSocket экранов с обязательной аутентификацией device token."""
 
 from __future__ import annotations
 
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
 from backend.models import Screen, SystemSetting
+from backend.screen_auth import get_screen_by_token
 
 
 router = APIRouter()
@@ -30,6 +30,13 @@ def _iso_z(value: Optional[datetime] = None) -> str:
     if value.tzinfo is not None:
         value = value.astimezone(timezone.utc).replace(tzinfo=None)
     return value.isoformat(timespec="seconds") + "Z"
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _get_schedule_version(db: Session) -> int:
@@ -66,10 +73,11 @@ class ScreenConnectionManager:
             self._connections_by_code.pop(screen_code, None)
         return screen_code
 
-    def get_code(self, websocket: WebSocket) -> Optional[str]:
-        return self._codes_by_connection.get(websocket)
-
-    async def send_to_screen(self, screen_code: str, message: dict[str, Any]) -> bool:
+    async def send_to_screen(
+        self,
+        screen_code: str,
+        message: dict[str, Any],
+    ) -> bool:
         websocket = self._connections_by_code.get(screen_code)
         if websocket is None:
             return False
@@ -113,44 +121,71 @@ def _mark_screen_offline_by_code(screen_code: Optional[str]) -> None:
         db.close()
 
 
-async def _handle_register(websocket: WebSocket, message: dict[str, Any]) -> Optional[str]:
-    screen_code = str(message.get("code") or "")
-    cached_schedule_version = int(message.get("cached_schedule_version") or 0)
+async def _send_register_failed(websocket: WebSocket, message: str) -> None:
+    await websocket.send_json(
+        {
+            "type": "register_failed",
+            "ok": False,
+            "error": "screen_auth_failed",
+            "message": message,
+        }
+    )
+
+
+async def _handle_register(
+    websocket: WebSocket,
+    message: dict[str, Any],
+) -> Optional[str]:
+    screen_token = str(message.get("screen_token") or "")
+    claimed_code = str(message.get("code") or "")
+    cached_schedule_version = _safe_int(
+        message.get("cached_schedule_version"),
+        0,
+    )
 
     db = SessionLocal()
     try:
-        screen = _find_screen(db, screen_code)
+        screen = get_screen_by_token(db, screen_token)
         if screen is None:
-            await websocket.send_json({
-                "type": "register_failed",
-                "ok": False,
-                "error": "screen_not_found",
-                "message": "Экран с указанным кодом не найден",
-            })
+            await _send_register_failed(
+                websocket,
+                "Не удалось подтвердить экран",
+            )
+            return None
+
+        if claimed_code and claimed_code != screen.code:
+            await _send_register_failed(
+                websocket,
+                "Токен принадлежит другому экрану",
+            )
             return None
 
         if not screen.is_connected:
-            await websocket.send_json({
-                "type": "register_failed",
-                "ok": False,
-                "error": "screen_disabled",
-                "message": "Экран отключён или ещё не подключён администратором",
-            })
+            await _send_register_failed(
+                websocket,
+                "Экран отключён администратором",
+            )
             return None
 
         current_schedule_version = _get_schedule_version(db)
         _mark_screen_online(db, screen)
-        await manager.register(screen_code, websocket)
+        await manager.register(screen.code, websocket)
 
-        await websocket.send_json({
-            "type": "registered",
-            "ok": True,
-            "screen_id": screen.id,
-            "server_time": _iso_z(),
-            "current_schedule_version": current_schedule_version,
-            "recommended_action": "none" if cached_schedule_version == current_schedule_version else "full_sync",
-        })
-        return screen_code
+        await websocket.send_json(
+            {
+                "type": "registered",
+                "ok": True,
+                "screen_id": screen.id,
+                "server_time": _iso_z(),
+                "current_schedule_version": current_schedule_version,
+                "recommended_action": (
+                    "none"
+                    if cached_schedule_version == current_schedule_version
+                    else "full_sync"
+                ),
+            }
+        )
+        return screen.code
     finally:
         db.close()
 
@@ -162,7 +197,7 @@ async def _handle_pong(screen_code: Optional[str]) -> None:
     db = SessionLocal()
     try:
         screen = _find_screen(db, screen_code)
-        if screen is not None:
+        if screen is not None and screen.is_connected:
             _mark_screen_online(db, screen)
     finally:
         db.close()
@@ -177,12 +212,10 @@ async def screens_websocket(websocket: WebSocket) -> None:
     try:
         first_message = await websocket.receive_json()
         if str(first_message.get("type") or "").lower() != "register":
-            await websocket.send_json({
-                "type": "register_failed",
-                "ok": False,
-                "error": "register_required",
-                "message": "Первым сообщением должен быть register",
-            })
+            await _send_register_failed(
+                websocket,
+                "Первым сообщением должен быть register",
+            )
             await websocket.close(code=1008)
             return
 
@@ -198,12 +231,16 @@ async def screens_websocket(websocket: WebSocket) -> None:
                     timeout=PING_INTERVAL_SECONDS,
                 )
             except asyncio.TimeoutError:
-                await websocket.send_json({
-                    "type": "ping",
-                    "server_time": _iso_z(),
-                })
+                await websocket.send_json(
+                    {
+                        "type": "ping",
+                        "server_time": _iso_z(),
+                    }
+                )
 
-                age = (datetime.now(timezone.utc) - last_seen).total_seconds()
+                age = (
+                    datetime.now(timezone.utc) - last_seen
+                ).total_seconds()
                 if age > PING_TIMEOUT_SECONDS:
                     await websocket.close(code=1001)
                     return
@@ -215,7 +252,6 @@ async def screens_websocket(websocket: WebSocket) -> None:
             if message_type == "pong":
                 await _handle_pong(registered_code)
             elif message_type == "register":
-                # Повторная регистрация допустима после reconnect/сброса состояния клиента.
                 registered_code = await _handle_register(websocket, message)
                 if not registered_code:
                     await websocket.close(code=1008)
@@ -258,18 +294,29 @@ async def notify_schedule_updated(
     await manager.broadcast(message)
 
 
-async def notify_slides_updated(slide_ids: list[int | str], reason: str = "slide_content_updated") -> None:
-    await manager.broadcast({
-        "type": "slides_updated",
-        "slide_ids": [str(slide_id) for slide_id in slide_ids],
-        "reason": reason,
-        "server_time": _iso_z(),
-    })
+async def notify_slides_updated(
+    slide_ids: list[int | str],
+    reason: str = "slide_content_updated",
+) -> None:
+    await manager.broadcast(
+        {
+            "type": "slides_updated",
+            "slide_ids": [str(slide_id) for slide_id in slide_ids],
+            "reason": reason,
+            "server_time": _iso_z(),
+        }
+    )
 
 
-async def notify_screen_disabled(screen_code: str, message: str = "Экран отключён администратором") -> None:
-    await manager.send_to_screen(screen_code, {
-        "type": "screen_disabled",
-        "message": message,
-        "server_time": _iso_z(),
-    })
+async def notify_screen_disabled(
+    screen_code: str,
+    message: str = "Экран отключён администратором",
+) -> None:
+    await manager.send_to_screen(
+        screen_code,
+        {
+            "type": "screen_disabled",
+            "message": message,
+            "server_time": _iso_z(),
+        },
+    )

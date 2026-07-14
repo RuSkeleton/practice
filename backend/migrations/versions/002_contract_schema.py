@@ -1,3 +1,4 @@
+
 """Bring database schema to the screen-client/server contract.
 
 Revision ID: 002_contract_schema

@@ -1,3 +1,4 @@
+
 """Безопасная смена пароля пользователя напрямую через SQLite/SQLAlchemy.
 
 Полезно при переходе со старой базы, когда production-start блокируется из-за
@@ -34,6 +35,7 @@ def main() -> None:
 
         auth.validate_password_strength(new_password, username=user.username)
         user.password_hash = auth.get_password_hash(new_password)
+        user.auth_version = int(user.auth_version or 1) + 1
         db.commit()
         print(f"Пароль пользователя '{user.username}' изменён")
     finally:

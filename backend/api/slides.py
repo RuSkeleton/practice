@@ -1,3 +1,4 @@
+
 """CRUD слайдов и уведомление экранов об изменениях."""
 
 from __future__ import annotations
@@ -9,13 +10,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend import crud, models, schemas
-from backend.auth import get_current_user, require_hr_or_admin
+from backend.auth import require_hr_or_admin
 from backend.database import SessionLocal, get_db
 from backend.routers.websocket import notify_schedule_updated, notify_slides_updated
 from backend.schedule_generator import ScheduleGenerator
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_hr_or_admin)])
 
 
 @router.post(
@@ -42,9 +43,8 @@ def create_slide(
 @router.get("/slides", response_model=List[schemas.SlideOut])
 def get_all_slides(
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
 ):
-    """Чтение разрешено всем авторизованным ролям, изменение — HR/admin."""
+    """Внутренний каталог слайдов доступен только HR/admin."""
     return crud.get_all_slides(db)
 
 
@@ -52,7 +52,6 @@ def get_all_slides(
 def get_slide(
     slide_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
 ):
     db_slide = crud.get_slide(db, slide_id)
     if db_slide is None:

@@ -1,3 +1,4 @@
+
 # backend/api/uploads.py
 # Загрузка изображений из админки. Раздача файлов делается через app.mount("/uploads", StaticFiles(...)).
 
@@ -8,12 +9,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
-from backend.auth import get_current_user
+from backend.auth import require_hr_or_admin
 from backend.config import BASE_DIR
 from backend.models import User
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_hr_or_admin)])
 
 UPLOADS_DIR = BASE_DIR / "uploads"
 ALLOWED_FOLDERS = {"slides", "backgrounds"}
@@ -32,7 +33,7 @@ def _safe_extension(filename: str) -> str:
 async def upload_image(
     file: UploadFile = File(...),
     folder: str = Query("slides", pattern="^(slides|backgrounds)$"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_hr_or_admin),
 ) -> dict[str, str | int | bool]:
     if folder not in ALLOWED_FOLDERS:
         raise HTTPException(status_code=400, detail="Invalid upload folder")

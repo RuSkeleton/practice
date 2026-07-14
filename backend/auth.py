@@ -1,3 +1,4 @@
+
 """Хеширование паролей, JWT и проверки ролей.
 
 Файл не содержит HTTP-маршрутов. Здесь собрана повторно используемая логика,
@@ -150,6 +151,7 @@ def create_access_token(
         "sub": str(user.id),
         "username": user.username,
         "role": user.role,
+        "ver": int(user.auth_version or 1),
         "type": "access",
         "iat": now,
         "exp": expires_at,
@@ -200,11 +202,14 @@ def get_current_user(
         if payload.get("type") != "access":
             raise credentials_exception
         user_id = int(payload.get("sub"))
+        token_version = int(payload.get("ver"))
     except (JWTError, TypeError, ValueError):
         raise credentials_exception
 
     user = db.get(models.User, user_id)
     if user is None:
+        raise credentials_exception
+    if token_version != int(user.auth_version or 1):
         raise credentials_exception
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Пользователь отключён")

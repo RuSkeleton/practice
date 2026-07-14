@@ -1,3 +1,4 @@
+
 """Pydantic-схемы внешнего API.
 
 Схемы валидируют форму входных данных до того, как они попадут в SQLAlchemy.
@@ -192,7 +193,7 @@ class SlideOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ScreenCreate(BaseModel):
-    code: str = Field(..., min_length=3, max_length=3, pattern=r"^[0-9]{3}$")
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
     name: str | None = Field(None, max_length=100)
     location: str | None = Field(None, max_length=200)
 
@@ -212,9 +213,24 @@ class ScreenOut(BaseModel):
     location: str | None
     is_connected: bool
     is_online: bool
+    is_paired: bool
+    pairing_expires_at: datetime | None
+    activated_at: datetime | None
+    token_created_at: datetime | None
     last_active: datetime | None
     created_at: datetime
 
 
+class ScreenPairingCodeOut(BaseModel):
+    code: str
+    expires_in_seconds: int
+
+
+class ScreenPairingOut(BaseModel):
+    screen_id: int
+    code: str
+    pairing_expires_at: datetime | None
+
+
 class ScreenActivate(BaseModel):
-    code: str = Field(..., min_length=3, max_length=3, pattern=r"^[0-9]{3}$")
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^[0-9]{6}$")

@@ -1,10 +1,19 @@
-"""HTTP API входа и управления пользователями."""
+"""HTTP API входа и управления пользователями.
+
+Маршруты разделены на три группы с политикой deny-by-default:
+* public_router: только вход и безопасная конфигурация страницы входа;
+* account_router: действия любого авторизованного пользователя;
+* admin_router: управление пользователями только для admin.
+
+Публичная регистрация удалена. Для разработки остаётся явный dev-bootstrap,
+а в рабочей системе новых пользователей создаёт администратор.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,6 +21,7 @@ from sqlalchemy.orm import Session
 from backend import auth, crud, models
 from backend.config import config
 from backend.database import get_db
+from backend.rate_limit import SlidingWindowRateLimiter
 from backend.schemas import (
     LoginResponse,
     PasswordChange,
@@ -23,11 +33,48 @@ from backend.schemas import (
 
 
 router = APIRouter()
+public_router = APIRouter()
+account_router = APIRouter(
+    dependencies=[Depends(auth.get_current_user)],
+)
+admin_router = APIRouter(
+    dependencies=[Depends(auth.require_admin)],
+)
+
+_login_account_limiter = SlidingWindowRateLimiter(
+    max_attempts=config.LOGIN_MAX_FAILED_ATTEMPTS_PER_ACCOUNT,
+    window_seconds=config.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+)
+_login_ip_limiter = SlidingWindowRateLimiter(
+    max_attempts=config.LOGIN_MAX_FAILED_ATTEMPTS_PER_IP,
+    window_seconds=config.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+)
 
 
 def _utc_now_naive() -> datetime:
     """Модели проекта пока хранят UTC как naive datetime."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _raise_if_login_limited(*, ip_key: str, account_key: str) -> None:
+    states = (
+        _login_ip_limiter.check(ip_key),
+        _login_account_limiter.check(account_key),
+    )
+    blocked = [state for state in states if not state.allowed]
+    if not blocked:
+        return
+
+    retry_after = max(state.retry_after_seconds for state in blocked)
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Слишком много неудачных попыток входа. Повторите позже",
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 def _active_admin_count(db: Session) -> int:
@@ -90,14 +137,13 @@ def _ensure_not_breaking_last_admin(
         )
 
 
+# ---------------------------------------------------------------------------
+# Явно публичные маршруты
+# ---------------------------------------------------------------------------
 
-@router.get("/public-config", response_model=PublicConfigOut)
+@public_router.get("/public-config", response_model=PublicConfigOut)
 def get_public_config() -> PublicConfigOut:
-    """Возвращает только настройки, которые разрешено видеть до входа.
-
-    Пароль появляется здесь исключительно при двух явных dev-флагах:
-    DEV_MODE=true и SHOW_DEV_LOGIN_HINTS=true.
-    """
+    """Возвращает только настройки, которые разрешено видеть до входа."""
     show_hints = bool(config.DEV_MODE and config.SHOW_DEV_LOGIN_HINTS)
     return PublicConfigOut(
         dev_mode=config.DEV_MODE,
@@ -107,21 +153,29 @@ def get_public_config() -> PublicConfigOut:
     )
 
 
-@router.post("/login", response_model=LoginResponse)
+@public_router.post("/login", response_model=LoginResponse)
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> LoginResponse:
-    """Проверяет пароль и выдаёт подписанный access token."""
+    """Проверяет пароль и выдаёт подписанный, отзывной access token."""
+    normalized_username = form_data.username.strip().lower()
+    ip_key = _client_ip(request)
+    account_key = f"{ip_key}:{normalized_username}"
+    _raise_if_login_limited(ip_key=ip_key, account_key=account_key)
+
     user = auth.authenticate_user(db, form_data.username, form_data.password)
     if user is None:
-        # Намеренно не сообщаем, существовал ли логин и была ли запись отключена.
+        _login_ip_limiter.record_failure(ip_key)
+        _login_account_limiter.record_failure(account_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный логин или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    _login_account_limiter.reset(account_key)
     user.last_login = _utc_now_naive()
     db.commit()
 
@@ -133,44 +187,24 @@ def login(
     )
 
 
-@router.post("/register", response_model=UserOut)
-def register(
-    user_data: UserCreate,
-    db: Session = Depends(get_db),
-) -> models.User:
-    """Неавторизованная регистрация существует только как dev-инструмент."""
-    if not (config.DEV_MODE and config.ENABLE_PUBLIC_REGISTER_IN_DEV):
-        raise HTTPException(status_code=403, detail="Публичная регистрация отключена")
+# ---------------------------------------------------------------------------
+# Любой авторизованный пользователь
+# ---------------------------------------------------------------------------
 
-    _ensure_username_available(db, user_data.username)
-    _ensure_email_available(db, str(user_data.email) if user_data.email else None)
-    return crud.create_user(db, user_data)
-
-
-@router.get("/users", response_model=list[UserOut])
-def list_users(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    _: models.User = Depends(auth.require_admin),
-):
-    return crud.get_users(db, skip=skip, limit=min(limit, 500))
-
-
-@router.get("/users/me", response_model=UserOut)
+@account_router.get("/users/me", response_model=UserOut)
 def get_current_user_info(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     return current_user
 
 
-@router.post("/auth/change-password")
+@account_router.post("/auth/change-password")
 def change_own_password(
     payload: PasswordChange,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Позволяет пользователю менять свой пароль без доступа к user CRUD."""
+    """Меняет пароль и немедленно отзывает все ранее выданные JWT."""
     if not auth.verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Текущий пароль указан неверно")
     if auth.verify_password(payload.new_password, current_user.password_hash):
@@ -181,15 +215,28 @@ def change_own_password(
         username=current_user.username,
     )
     current_user.password_hash = auth.get_password_hash(payload.new_password)
+    current_user.auth_version = int(current_user.auth_version or 1) + 1
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "reauthentication_required": True}
 
 
-@router.get("/users/{user_id}", response_model=UserOut)
+# ---------------------------------------------------------------------------
+# Только администратор
+# ---------------------------------------------------------------------------
+
+@admin_router.get("/users", response_model=list[UserOut])
+def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    return crud.get_users(db, skip=skip, limit=min(limit, 500))
+
+
+@admin_router.get("/users/{user_id}", response_model=UserOut)
 def get_user_by_id(
     user_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(auth.require_admin),
 ):
     user = crud.get_user(db, user_id)
     if user is None:
@@ -197,11 +244,14 @@ def get_user_by_id(
     return user
 
 
-@router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@admin_router.post(
+    "/users",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_new_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(auth.require_admin),
 ):
     _ensure_username_available(db, user_data.username)
     _ensure_email_available(db, str(user_data.email) if user_data.email else None)
@@ -216,12 +266,11 @@ def create_new_user(
         ) from exc
 
 
-@router.put("/users/{user_id}", response_model=UserOut)
+@admin_router.put("/users/{user_id}", response_model=UserOut)
 def update_existing_user(
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(auth.require_admin),
 ):
     user = crud.get_user(db, user_id)
     if user is None:
@@ -256,7 +305,7 @@ def update_existing_user(
     return updated_user
 
 
-@router.delete("/users/{user_id}")
+@admin_router.delete("/users/{user_id}")
 def delete_existing_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -281,3 +330,10 @@ def delete_existing_user(
 
     crud.delete_user(db, user_id)
     return {"ok": True}
+
+
+# Статические /users/me и /auth/change-password подключаются раньше динамического
+# /users/{user_id}, поэтому FastAPI не пытается разобрать "me" как integer.
+router.include_router(public_router)
+router.include_router(account_router)
+router.include_router(admin_router)
