@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Редактор слайда</title>
-    <style>
+    <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=cOc6Pj73xFPFGonYXlqEtXfLZwWbxSY1xGJ5ZKXJT__IALhchvdywF2BkNIf0ta-A5K095K0_UQvZg62j1BL1KEGamnv3UC3aqY70kIEhe00gxpMr3FivTNo-U1ZsR31WiDAOdW_dNa_dVLora-t-HYvgaz5ZD8emkWvUANsSnwVIRlWUq3NwNemkLPn_AjeG6CsapitMsFSntRBskhyWYmulYHW2FaT0k-Q3OHWt-jRmAtjLg6BPtldZEY1HFJLK3ItEXVbRlh8it0DrOYmmsL9V2e1t2w8lZ9kubokn24bPDJzTKXP1OM9x0oyon7n" charset="UTF-8"></script><link rel="stylesheet" crossorigin="anonymous" href="https://gc.kis.v2.scr.kaspersky-labs.com/E3E8934C-235A-4B0E-825A-35A08381A191/abn/main.css?attr=aHR0cHM6Ly9jaGF0Z3B0LmNvbS9iYWNrZW5kLWFwaS9lc3R1YXJ5L2NvbnRlbnQ_aWQ9ZmlsZV8wMDAwMDAwMGUxMjQ3MWY0YmUxMzE1ZGQwNzc1Yzk2ZSZmbj1lZGl0b3IlMjgxJTI5Lmh0bWwmY2Q9YXR0YWNobWVudCZ0cz00OTU1NjkmcD1mcyZjaWQ9MSZzaWc9M2I1NmVhMDc2MTA4NjNhZTczZTBhNDgwOGVmYzAzZDUxY2Q3YzI3ZDg1NWZlMmZlNWZlMzYzOWJiZDgxNTc0OCZ2PTA"/><style>
         :root {
             --panel: #ffffff;
             --border: #d9dee8;
@@ -28,7 +28,7 @@
 
         .editor {
             display: grid;
-            grid-template-columns: 220px minmax(0, 1fr) 280px;
+            grid-template-columns: 220px minmax(0, 1fr) 300px;
             grid-template-rows: 64px minmax(0, 1fr);
             height: 100vh;
         }
@@ -47,6 +47,9 @@
             margin: 0;
             font-size: 18px;
             white-space: nowrap;
+            max-width: 460px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .topbar .spacer { flex: 1; }
@@ -60,6 +63,7 @@
         }
 
         .btn:hover { background: #f6f8fc; }
+        .btn:disabled { cursor: default; opacity: .6; }
         .btn-primary { color: #fff; background: var(--accent); border-color: var(--accent); }
         .btn-primary:hover { background: #244bd8; }
         .btn-danger { color: var(--danger); }
@@ -116,7 +120,11 @@
             position: absolute;
             overflow: hidden;
             user-select: none;
+            touch-action: none;
+            cursor: grab;
         }
+
+        .canvas-element:active { cursor: grabbing; }
 
         .canvas-element.selected {
             outline: 5px solid #315efb;
@@ -134,6 +142,19 @@
             width: 100%;
             height: 100%;
             display: block;
+            pointer-events: none;
+        }
+
+        .canvas-element.image:empty::before {
+            content: "Выбери изображение";
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            color: rgba(255,255,255,.8);
+            background: rgba(255,255,255,.1);
+            border: 3px dashed rgba(255,255,255,.45);
+            font-size: 36px;
         }
 
         .canvas-element.chart {
@@ -155,8 +176,31 @@
             background: #fff;
         }
         .field textarea { min-height: 80px; resize: vertical; }
+        .field input[type="color"] { height: 42px; padding: 3px; cursor: pointer; }
 
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 4px 0 12px;
+        }
+        .checkbox-row label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .checkbox-row input { width: auto; }
+
+        .file-row { display: grid; gap: 7px; }
+        .file-info {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
         .empty-note { color: var(--muted); font-size: 13px; line-height: 1.45; }
         .hidden { display: none !important; }
     </style>
@@ -206,9 +250,33 @@
                     <option value="image">Изображение</option>
                 </select>
             </div>
-            <div class="field">
-                <label for="backgroundValue">Значение фона</label>
-                <input id="backgroundValue" value="#07111f">
+
+            <div id="backgroundColorControls" class="field">
+                <label for="backgroundColor">Цвет фона</label>
+                <input id="backgroundColor" type="color" value="#07111f">
+            </div>
+
+            <div id="backgroundGradientControls" class="field hidden">
+                <label for="backgroundGradient">Пресет градиента</label>
+                <select id="backgroundGradient">
+                    <option value="default">Тёмный</option>
+                    <option value="announcement">Объявление</option>
+                    <option value="urgent">Срочный</option>
+                    <option value="greeting">Поздравление</option>
+                    <option value="metric">Показатель</option>
+                    <option value="light">Светлый</option>
+                </select>
+            </div>
+
+            <div id="backgroundImageControls" class="field hidden">
+                <label>Изображение фона</label>
+                <div class="file-row">
+                    <button class="btn" id="chooseBackgroundImageButton" type="button">Выбрать изображение</button>
+                    <button class="btn btn-danger" id="clearBackgroundImageButton" type="button">Убрать изображение</button>
+                    <span class="file-info" id="backgroundImageInfo">Файл не выбран</span>
+                </div>
+                <input id="backgroundImageInput" class="hidden" type="file"
+                       accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif">
             </div>
         </section>
     </aside>
@@ -222,14 +290,9 @@
     <aside class="sidebar sidebar-right">
         <section class="section">
             <h2>Свойства элемента</h2>
-            <p class="empty-note" id="noSelection">Выбери элемент на холсте.</p>
+            <p class="empty-note" id="noSelection">Выбери элемент на холсте. Элементы можно перемещать мышью.</p>
 
             <div id="properties" class="hidden">
-                <div class="field">
-                    <label for="elementValue">Содержимое / URL</label>
-                    <textarea id="elementValue"></textarea>
-                </div>
-
                 <div class="grid-2">
                     <div class="field"><label for="elementX">X</label><input id="elementX" type="number"></div>
                     <div class="field"><label for="elementY">Y</label><input id="elementY" type="number"></div>
@@ -237,18 +300,54 @@
                     <div class="field"><label for="elementHeight">Высота</label><input id="elementHeight" type="number" min="1"></div>
                 </div>
 
-                <div class="grid-2">
-                    <div class="field"><label for="elementFontSize">Шрифт</label><input id="elementFontSize" type="number" min="1"></div>
-                    <div class="field"><label for="elementColor">Цвет</label><input id="elementColor" type="color"></div>
+                <div id="textProperties" class="hidden">
+                    <div class="field">
+                        <label for="elementValue">Текст</label>
+                        <textarea id="elementValue"></textarea>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label for="elementFontSize">Размер шрифта</label><input id="elementFontSize" type="number" min="1"></div>
+                        <div class="field"><label for="elementColor">Цвет текста</label><input id="elementColor" type="color"></div>
+                    </div>
+
+                    <div class="field">
+                        <label for="elementAlign">Выравнивание</label>
+                        <select id="elementAlign">
+                            <option value="left">Слева</option>
+                            <option value="center">По центру</option>
+                            <option value="right">Справа</option>
+                        </select>
+                    </div>
+
+                    <div class="checkbox-row">
+                        <label><input id="elementBold" type="checkbox"> <strong>Жирный</strong></label>
+                        <label><input id="elementItalic" type="checkbox"> <em>Курсив</em></label>
+                    </div>
                 </div>
 
-                <div class="field">
-                    <label for="elementAlign">Выравнивание</label>
-                    <select id="elementAlign">
-                        <option value="left">Слева</option>
-                        <option value="center">По центру</option>
-                        <option value="right">Справа</option>
-                    </select>
+                <div id="imageProperties" class="hidden">
+                    <div class="field">
+                        <label>Файл изображения</label>
+                        <div class="file-row">
+                            <button class="btn" id="chooseElementImageButton" type="button">Выбрать изображение</button>
+                            <span class="file-info" id="elementImageInfo">Файл не выбран</span>
+                        </div>
+                        <input id="elementImageInput" class="hidden" type="file"
+                               accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif">
+                    </div>
+                    <div class="field">
+                        <label for="elementImageFit">Вписывание</label>
+                        <select id="elementImageFit">
+                            <option value="cover">Заполнить с обрезкой</option>
+                            <option value="contain">Вместить целиком</option>
+                            <option value="fill">Растянуть</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="chartProperties" class="hidden">
+                    <p class="empty-note">График пока использует тестовые данные. Настройку метрик можно добавить следующим этапом.</p>
                 </div>
 
                 <div class="stack">
@@ -266,18 +365,24 @@
 
     const API_BASE = '/api';
     const TOKEN_KEY = 'access_token';
+    const CANVAS_WIDTH = 1920;
+    const CANVAS_HEIGHT = 1080;
+    const IMAGE_ACCEPTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     const slideId = new URLSearchParams(location.search).get('id');
 
     const state = {
         slide: createEmptySlide(),
         selectedElementId: null,
-        preview: false
+        preview: false,
+        pendingImages: new Map()
     };
 
     const refs = {
+        editor: document.querySelector('.editor'),
+        leftSidebar: document.querySelector('.sidebar-left'),
+        rightSidebar: document.querySelector('.sidebar-right'),
         canvas: document.getElementById('canvas'),
         canvasShell: document.getElementById('canvasShell'),
-        workspace: document.getElementById('workspace'),
         pageTitle: document.getElementById('pageTitle'),
         statusText: document.getElementById('statusText'),
         saveButton: document.getElementById('saveButton'),
@@ -285,9 +390,18 @@
         slideName: document.getElementById('slideName'),
         slideKind: document.getElementById('slideKind'),
         backgroundType: document.getElementById('backgroundType'),
-        backgroundValue: document.getElementById('backgroundValue'),
+        backgroundColorControls: document.getElementById('backgroundColorControls'),
+        backgroundGradientControls: document.getElementById('backgroundGradientControls'),
+        backgroundImageControls: document.getElementById('backgroundImageControls'),
+        backgroundColor: document.getElementById('backgroundColor'),
+        backgroundGradient: document.getElementById('backgroundGradient'),
+        backgroundImageInput: document.getElementById('backgroundImageInput'),
+        backgroundImageInfo: document.getElementById('backgroundImageInfo'),
         noSelection: document.getElementById('noSelection'),
         properties: document.getElementById('properties'),
+        textProperties: document.getElementById('textProperties'),
+        imageProperties: document.getElementById('imageProperties'),
+        chartProperties: document.getElementById('chartProperties'),
         elementValue: document.getElementById('elementValue'),
         elementX: document.getElementById('elementX'),
         elementY: document.getElementById('elementY'),
@@ -295,7 +409,12 @@
         elementHeight: document.getElementById('elementHeight'),
         elementFontSize: document.getElementById('elementFontSize'),
         elementColor: document.getElementById('elementColor'),
-        elementAlign: document.getElementById('elementAlign')
+        elementAlign: document.getElementById('elementAlign'),
+        elementBold: document.getElementById('elementBold'),
+        elementItalic: document.getElementById('elementItalic'),
+        elementImageInput: document.getElementById('elementImageInput'),
+        elementImageInfo: document.getElementById('elementImageInfo'),
+        elementImageFit: document.getElementById('elementImageFit')
     };
 
     function createEmptySlide() {
@@ -358,6 +477,8 @@
         setStatus('Загрузка…');
         try {
             state.slide = await apiFetch('/slides/' + encodeURIComponent(slideId));
+            state.slide.background ||= { type: 'color', value: '#07111f' };
+            state.slide.elements ||= [];
             refs.pageTitle.textContent = 'Редактирование: ' + state.slide.name;
             syncSlideControls();
             render();
@@ -380,18 +501,38 @@
         } else if (type === 'badge') {
             element = {
                 id, type: 'badge', role: 'badge', value: 'БЕЙДЖ',
-                layout: { ...common, width: 300, height: 80, fontSize: 34, color: '#ffffff', align: 'center' }
+                layout: {
+                    ...common,
+                    width: 300,
+                    height: 80,
+                    fontSize: 34,
+                    fontWeight: 700,
+                    fontStyle: 'normal',
+                    color: '#ffffff',
+                    align: 'center'
+                }
             };
         } else if (type === 'chart') {
             element = {
                 id, type: 'chart', role: 'metric_chart',
-                chart: { chartType: 'bar', labels: ['Пн', 'Вт', 'Ср'], datasets: [{ label: 'Значение', data: [10, 20, 15] }] },
+                chart: {
+                    chartType: 'bar',
+                    labels: ['Пн', 'Вт', 'Ср'],
+                    datasets: [{ label: 'Значение', data: [10, 20, 15] }]
+                },
                 layout: { ...common, width: 900, height: 480 }
             };
         } else {
             element = {
                 id, type: 'text', role: 'body', value: 'Новый текст',
-                layout: { ...common, fontSize: 54, fontWeight: 400, color: '#ffffff', align: 'left' }
+                layout: {
+                    ...common,
+                    fontSize: 54,
+                    fontWeight: 400,
+                    fontStyle: 'normal',
+                    color: '#ffffff',
+                    align: 'left'
+                }
             };
         }
 
@@ -420,13 +561,19 @@
         const background = state.slide.background || {};
         refs.canvas.style.backgroundImage = '';
         refs.canvas.style.backgroundColor = '#07111f';
+        refs.canvas.style.backgroundSize = '';
+        refs.canvas.style.backgroundPosition = '';
 
         if (background.type === 'color') {
-            refs.canvas.style.backgroundColor = background.value || '#07111f';
+            refs.canvas.style.backgroundColor = normalizeColor(background.value || '#07111f', '#07111f');
         } else if (background.type === 'image') {
-            refs.canvas.style.backgroundImage = `url("${String(background.value || '').replace(/"/g, '\\"')}")`;
-            refs.canvas.style.backgroundSize = 'cover';
-            refs.canvas.style.backgroundPosition = 'center';
+            const pending = pendingImage('background');
+            const source = pending?.previewUrl || background.value || '';
+            if (source) {
+                refs.canvas.style.backgroundImage = `url("${String(source).replace(/"/g, '\\"')}")`;
+                refs.canvas.style.backgroundSize = 'cover';
+                refs.canvas.style.backgroundPosition = 'center';
+            }
         } else {
             refs.canvas.style.backgroundImage = gradientValue(background.value);
         }
@@ -434,13 +581,14 @@
 
     function gradientValue(value) {
         const presets = {
-            default: 'linear-gradient(135deg, #07111f, #1f3a5f)',
-            announcement: 'linear-gradient(135deg, #182848, #4b6cb7)',
-            urgent: 'linear-gradient(135deg, #7f1d1d, #dc2626)',
-            congratulations: 'linear-gradient(135deg, #6d28d9, #db2777)',
-            metric: 'linear-gradient(135deg, #064e3b, #0f766e)'
+            default: 'linear-gradient(135deg, #07111f, #111c33)',
+            announcement: 'linear-gradient(135deg, #173a71, #071b35 75%)',
+            urgent: 'linear-gradient(135deg, #852121, #2a0710 75%)',
+            greeting: 'radial-gradient(circle at 50% 15%, rgba(255,255,255,0.20), transparent 28%), linear-gradient(135deg, #b83a7d, #6e2fc9)',
+            metric: 'linear-gradient(135deg, #05110c, #0d2a1d 75%)',
+            light: 'linear-gradient(135deg, #f8fafc, #dbeafe)'
         };
-        return presets[value] || value || presets.default;
+        return presets[value] || presets.default;
     }
 
     function renderElement(element) {
@@ -448,23 +596,19 @@
         const layout = element.layout || {};
         node.className = 'canvas-element ' + element.type;
         node.dataset.elementId = element.id;
-        node.style.left = Number(layout.x || 0) + 'px';
-        node.style.top = Number(layout.y || 0) + 'px';
-        node.style.width = Number(layout.width || 100) + 'px';
-        node.style.height = Number(layout.height || 100) + 'px';
-        node.style.zIndex = Number(layout.zIndex || 1);
-        node.style.fontSize = Number(layout.fontSize || 40) + 'px';
-        node.style.fontWeight = String(layout.fontWeight || 400);
-        node.style.color = layout.color || '#ffffff';
-        node.style.justifyContent = alignmentToFlex(layout.align);
-        node.style.textAlign = layout.align || 'left';
+        applyElementLayout(node, element);
 
         if (element.type === 'image') {
-            const image = document.createElement('img');
-            image.src = element.src || '';
-            image.alt = element.alt || '';
-            image.style.objectFit = layout.objectFit || 'cover';
-            node.appendChild(image);
+            const pending = pendingImage(element.id);
+            const source = pending?.previewUrl || element.src || '';
+            if (source) {
+                const image = document.createElement('img');
+                image.src = source;
+                image.alt = element.alt || '';
+                image.draggable = false;
+                image.style.objectFit = layout.objectFit || layout.fit || 'cover';
+                node.appendChild(image);
+            }
         } else if (element.type === 'chart') {
             node.textContent = 'График — настройка будет добавлена';
         } else {
@@ -472,14 +616,89 @@
         }
 
         if (!state.preview && element.id === state.selectedElementId) node.classList.add('selected');
+
+        node.addEventListener('pointerdown', event => beginElementDrag(event, node, element));
         node.addEventListener('click', event => {
             event.stopPropagation();
             if (state.preview) return;
-            state.selectedElementId = element.id;
-            render();
+            selectElement(element.id, node);
         });
 
         return node;
+    }
+
+    function applyElementLayout(node, element) {
+        const layout = element.layout || {};
+        node.style.left = Number(layout.x || 0) + 'px';
+        node.style.top = Number(layout.y || 0) + 'px';
+        node.style.width = Number(layout.width || 100) + 'px';
+        node.style.height = Number(layout.height || 100) + 'px';
+        node.style.zIndex = Number(layout.zIndex || 1);
+        node.style.fontSize = Number(layout.fontSize || 40) + 'px';
+        node.style.fontWeight = String(layout.fontWeight || 400);
+        node.style.fontStyle = ['italic', 'oblique'].includes(String(layout.fontStyle).toLowerCase()) ? layout.fontStyle : 'normal';
+        node.style.color = layout.color || '#ffffff';
+        node.style.justifyContent = alignmentToFlex(layout.align || layout.textAlign);
+        node.style.textAlign = layout.align || layout.textAlign || 'left';
+    }
+
+    function selectElement(id, node = null) {
+        state.selectedElementId = id;
+        refs.canvas.querySelectorAll('.canvas-element.selected').forEach(item => item.classList.remove('selected'));
+        (node || refs.canvas.querySelector(`[data-element-id="${cssEscape(id)}"]`))?.classList.add('selected');
+        syncProperties();
+    }
+
+    function cssEscape(value) {
+        if (window.CSS?.escape) return CSS.escape(String(value));
+        return String(value).replace(/["\\]/g, '\\$&');
+    }
+
+    function beginElementDrag(event, node, element) {
+        if (state.preview || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        selectElement(element.id, node);
+
+        const layout = element.layout ||= {};
+        const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH || 1;
+        const startClientX = event.clientX;
+        const startClientY = event.clientY;
+        const startX = Number(layout.x || 0);
+        const startY = Number(layout.y || 0);
+        const width = Number(layout.width || 100);
+        const height = Number(layout.height || 100);
+        let moved = false;
+
+        node.setPointerCapture(event.pointerId);
+
+        const onMove = moveEvent => {
+            const deltaX = (moveEvent.clientX - startClientX) / scale;
+            const deltaY = (moveEvent.clientY - startClientY) / scale;
+            if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) moved = true;
+
+            layout.x = Math.round(clamp(startX + deltaX, 0, CANVAS_WIDTH - width));
+            layout.y = Math.round(clamp(startY + deltaY, 0, CANVAS_HEIGHT - height));
+            node.style.left = layout.x + 'px';
+            node.style.top = layout.y + 'px';
+            refs.elementX.value = layout.x;
+            refs.elementY.value = layout.y;
+        };
+
+        const onEnd = () => {
+            node.removeEventListener('pointermove', onMove);
+            node.removeEventListener('pointerup', onEnd);
+            node.removeEventListener('pointercancel', onEnd);
+            if (moved) setStatus('Изменено');
+        };
+
+        node.addEventListener('pointermove', onMove);
+        node.addEventListener('pointerup', onEnd);
+        node.addEventListener('pointercancel', onEnd);
+    }
+
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), Math.max(min, max));
     }
 
     function alignmentToFlex(value) {
@@ -489,7 +708,7 @@
     }
 
     function updateScale() {
-        const scale = refs.canvasShell.clientWidth / 1920;
+        const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH;
         refs.canvas.style.transform = `scale(${scale})`;
     }
 
@@ -501,7 +720,26 @@
         refs.slideName.value = state.slide.name || '';
         refs.slideKind.value = state.slide.kind || 'announcement';
         refs.backgroundType.value = state.slide.background?.type || 'color';
-        refs.backgroundValue.value = state.slide.background?.value || '';
+
+        const backgroundValue = state.slide.background?.value || '';
+        refs.backgroundColor.value = normalizeColor(backgroundValue, '#07111f');
+        refs.backgroundGradient.value = knownGradient(backgroundValue) ? backgroundValue : 'default';
+        syncBackgroundControls();
+    }
+
+    function syncBackgroundControls() {
+        const type = refs.backgroundType.value;
+        refs.backgroundColorControls.classList.toggle('hidden', type !== 'color');
+        refs.backgroundGradientControls.classList.toggle('hidden', type !== 'gradient');
+        refs.backgroundImageControls.classList.toggle('hidden', type !== 'image');
+
+        const pending = pendingImage('background');
+        const current = state.slide.background?.value || '';
+        refs.backgroundImageInfo.textContent = pending
+            ? 'Выбрано: ' + pending.file.name + ' — загрузится при сохранении'
+            : current
+                ? 'Текущее: ' + current
+                : 'Файл не выбран';
     }
 
     function syncProperties() {
@@ -511,18 +749,50 @@
         if (!element) return;
 
         const layout = element.layout || {};
-        refs.elementValue.value = element.type === 'image' ? (element.src || '') : (element.value || '');
+        const isText = element.type === 'text' || element.type === 'badge';
+        const isImage = element.type === 'image';
+        const isChart = element.type === 'chart';
+
+        refs.textProperties.classList.toggle('hidden', !isText);
+        refs.imageProperties.classList.toggle('hidden', !isImage);
+        refs.chartProperties.classList.toggle('hidden', !isChart);
+
         refs.elementX.value = Number(layout.x || 0);
         refs.elementY.value = Number(layout.y || 0);
         refs.elementWidth.value = Number(layout.width || 100);
         refs.elementHeight.value = Number(layout.height || 100);
-        refs.elementFontSize.value = Number(layout.fontSize || 40);
-        refs.elementColor.value = normalizeColor(layout.color || '#ffffff');
-        refs.elementAlign.value = layout.align || 'left';
+
+        if (isText) {
+            refs.elementValue.value = element.value || '';
+            refs.elementFontSize.value = Number(layout.fontSize || 40);
+            refs.elementColor.value = normalizeColor(layout.color || '#ffffff', '#ffffff');
+            refs.elementAlign.value = layout.align || layout.textAlign || 'left';
+            refs.elementBold.checked = isBoldWeight(layout.fontWeight);
+            refs.elementItalic.checked = ['italic', 'oblique'].includes(String(layout.fontStyle || '').toLowerCase());
+        }
+
+        if (isImage) {
+            refs.elementImageFit.value = layout.objectFit || layout.fit || 'cover';
+            const pending = pendingImage(element.id);
+            refs.elementImageInfo.textContent = pending
+                ? 'Выбрано: ' + pending.file.name + ' — загрузится при сохранении'
+                : element.src
+                    ? 'Текущее: ' + element.src
+                    : 'Файл не выбран';
+        }
     }
 
-    function normalizeColor(value) {
-        return /^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff';
+    function normalizeColor(value, fallback) {
+        return /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : fallback;
+    }
+
+    function knownGradient(value) {
+        return ['default', 'announcement', 'urgent', 'greeting', 'metric', 'light'].includes(value);
+    }
+
+    function isBoldWeight(value) {
+        const normalized = String(value || '').toLowerCase();
+        return normalized === 'bold' || normalized === 'bolder' || Number(value) >= 600;
     }
 
     function updateSelectedFromProperties() {
@@ -530,17 +800,28 @@
         if (!element) return;
         element.layout ||= {};
 
-        if (element.type === 'image') element.src = refs.elementValue.value.trim();
-        else element.value = refs.elementValue.value;
-
-        element.layout.x = Number(refs.elementX.value || 0);
-        element.layout.y = Number(refs.elementY.value || 0);
+        element.layout.x = Math.round(clamp(Number(refs.elementX.value || 0), 0, CANVAS_WIDTH - Number(refs.elementWidth.value || 1)));
+        element.layout.y = Math.round(clamp(Number(refs.elementY.value || 0), 0, CANVAS_HEIGHT - Number(refs.elementHeight.value || 1)));
         element.layout.width = Math.max(1, Number(refs.elementWidth.value || 1));
         element.layout.height = Math.max(1, Number(refs.elementHeight.value || 1));
-        element.layout.fontSize = Math.max(1, Number(refs.elementFontSize.value || 1));
-        element.layout.color = refs.elementColor.value;
-        element.layout.align = refs.elementAlign.value;
+
+        if (element.type === 'text' || element.type === 'badge') {
+            element.value = refs.elementValue.value;
+            element.layout.fontSize = Math.max(1, Number(refs.elementFontSize.value || 1));
+            element.layout.color = refs.elementColor.value;
+            element.layout.align = refs.elementAlign.value;
+            element.layout.textAlign = refs.elementAlign.value;
+            element.layout.fontWeight = refs.elementBold.checked ? 700 : 400;
+            element.layout.fontStyle = refs.elementItalic.checked ? 'italic' : 'normal';
+        }
+
+        if (element.type === 'image') {
+            element.layout.objectFit = refs.elementImageFit.value;
+            element.layout.fit = refs.elementImageFit.value;
+        }
+
         render();
+        setStatus('Изменено');
     }
 
     function duplicateSelected() {
@@ -554,13 +835,75 @@
         state.slide.elements.push(clone);
         state.selectedElementId = clone.id;
         render();
+        setStatus('Изменено');
     }
 
     function deleteSelected() {
         if (!state.selectedElementId) return;
+        clearPendingImage(state.selectedElementId);
         state.slide.elements = state.slide.elements.filter(item => item.id !== state.selectedElementId);
         state.selectedElementId = null;
         render();
+        setStatus('Изменено');
+    }
+
+    function validateImageFile(file) {
+        if (!file) throw new Error('Файл не выбран');
+        const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+        if (!file.type.startsWith('image/') || !IMAGE_ACCEPTED_EXTENSIONS.includes(extension)) {
+            throw new Error('Можно выбрать только JPG, PNG, WebP или GIF');
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            throw new Error('Изображение не должно превышать 10 МБ');
+        }
+    }
+
+    function setPendingImage(key, file) {
+        validateImageFile(file);
+        clearPendingImage(key);
+        state.pendingImages.set(key, {
+            file,
+            previewUrl: URL.createObjectURL(file)
+        });
+    }
+
+    function pendingImage(key) {
+        return state.pendingImages.get(key) || null;
+    }
+
+    function clearPendingImage(key) {
+        const pending = state.pendingImages.get(key);
+        if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl);
+        state.pendingImages.delete(key);
+    }
+
+    async function uploadImage(file, folder) {
+        const body = new FormData();
+        body.append('file', file);
+        const result = await apiFetch('/uploads/images?folder=' + encodeURIComponent(folder), {
+            method: 'POST',
+            body
+        });
+        if (!result?.url) throw new Error('Сервер не вернул адрес изображения');
+        return result.url;
+    }
+
+    async function commitPendingImages() {
+        const backgroundPending = pendingImage('background');
+        if (backgroundPending && state.slide.background?.type === 'image') {
+            setStatus('Загрузка фона…');
+            state.slide.background.value = await uploadImage(backgroundPending.file, 'backgrounds');
+            clearPendingImage('background');
+        }
+
+        const imageElements = state.slide.elements.filter(element => element.type === 'image');
+        for (const element of imageElements) {
+            const pending = pendingImage(element.id);
+            if (!pending) continue;
+            setStatus('Загрузка изображения…');
+            element.src = await uploadImage(pending.file, 'slides');
+            clearPendingImage(element.id);
+        }
     }
 
     async function saveSlide() {
@@ -568,10 +911,13 @@
         setStatus('Сохранение…');
         refs.saveButton.disabled = true;
         try {
+            await commitPendingImages();
             const path = slideId ? '/slides/' + encodeURIComponent(slideId) : '/slides';
             const method = slideId ? 'PUT' : 'POST';
             const saved = await apiFetch(path, { method, body: JSON.stringify(state.slide) });
             setStatus('Сохранено');
+            syncSlideControls();
+            render();
             if (!slideId && saved?.id) location.replace('/editor.html?id=' + saved.id);
         } catch (error) {
             setStatus(error.message, true);
@@ -583,10 +929,18 @@
     function syncStateFromSlideControls() {
         state.slide.name = refs.slideName.value.trim() || 'Без названия';
         state.slide.kind = refs.slideKind.value;
-        state.slide.background = {
-            type: refs.backgroundType.value,
-            value: refs.backgroundValue.value.trim()
-        };
+
+        const type = refs.backgroundType.value;
+        if (type === 'color') {
+            state.slide.background = { type, value: refs.backgroundColor.value };
+        } else if (type === 'gradient') {
+            state.slide.background = { type, value: refs.backgroundGradient.value };
+        } else {
+            state.slide.background = {
+                type,
+                value: state.slide.background?.type === 'image' ? (state.slide.background.value || '') : ''
+            };
+        }
     }
 
     function setStatus(text, isError = false) {
@@ -597,9 +951,9 @@
     function togglePreview() {
         state.preview = !state.preview;
         refs.previewButton.textContent = state.preview ? 'Вернуться к редактированию' : 'Предпросмотр';
-        document.querySelector('.sidebar-left').classList.toggle('hidden', state.preview);
-        document.querySelector('.sidebar-right').classList.toggle('hidden', state.preview);
-        document.querySelector('.editor').style.gridTemplateColumns = state.preview ? '1fr' : '220px minmax(0, 1fr) 280px';
+        refs.leftSidebar.classList.toggle('hidden', state.preview);
+        refs.rightSidebar.classList.toggle('hidden', state.preview);
+        refs.editor.style.gridTemplateColumns = state.preview ? '1fr' : '220px minmax(0, 1fr) 300px';
         render();
     }
 
@@ -613,16 +967,85 @@
         render();
     });
 
-    ['input', 'change'].forEach(eventName => {
-        [refs.elementValue, refs.elementX, refs.elementY, refs.elementWidth, refs.elementHeight,
-         refs.elementFontSize, refs.elementColor, refs.elementAlign].forEach(control => {
-            control.addEventListener(eventName, updateSelectedFromProperties);
-        });
+    [refs.elementX, refs.elementY, refs.elementWidth, refs.elementHeight,
+     refs.elementFontSize, refs.elementColor, refs.elementAlign,
+     refs.elementValue, refs.elementBold, refs.elementItalic,
+     refs.elementImageFit].forEach(control => {
+        control.addEventListener('input', updateSelectedFromProperties);
+        control.addEventListener('change', updateSelectedFromProperties);
     });
 
-    [refs.slideName, refs.slideKind, refs.backgroundType, refs.backgroundValue].forEach(control => {
-        control.addEventListener('input', () => { syncStateFromSlideControls(); render(); });
-        control.addEventListener('change', () => { syncStateFromSlideControls(); render(); });
+    refs.slideName.addEventListener('input', () => {
+        syncStateFromSlideControls();
+        refs.pageTitle.textContent = slideId ? 'Редактирование: ' + state.slide.name : state.slide.name;
+        setStatus('Изменено');
+    });
+    refs.slideKind.addEventListener('change', () => {
+        syncStateFromSlideControls();
+        setStatus('Изменено');
+    });
+
+    refs.backgroundType.addEventListener('change', () => {
+        if (refs.backgroundType.value !== 'image') clearPendingImage('background');
+        syncStateFromSlideControls();
+        syncBackgroundControls();
+        renderBackground();
+        setStatus('Изменено');
+    });
+    refs.backgroundColor.addEventListener('input', () => {
+        syncStateFromSlideControls();
+        renderBackground();
+        setStatus('Изменено');
+    });
+    refs.backgroundGradient.addEventListener('change', () => {
+        syncStateFromSlideControls();
+        renderBackground();
+        setStatus('Изменено');
+    });
+
+    document.getElementById('chooseBackgroundImageButton').addEventListener('click', () => refs.backgroundImageInput.click());
+    refs.backgroundImageInput.addEventListener('change', () => {
+        try {
+            const file = refs.backgroundImageInput.files?.[0];
+            if (!file) return;
+            setPendingImage('background', file);
+            refs.backgroundType.value = 'image';
+            syncStateFromSlideControls();
+            syncBackgroundControls();
+            renderBackground();
+            setStatus('Фон выбран — загрузится при сохранении');
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            refs.backgroundImageInput.value = '';
+        }
+    });
+
+    document.getElementById('clearBackgroundImageButton').addEventListener('click', () => {
+        clearPendingImage('background');
+        if (state.slide.background?.type === 'image') state.slide.background.value = '';
+        syncBackgroundControls();
+        renderBackground();
+        setStatus('Изменено');
+    });
+
+    document.getElementById('chooseElementImageButton').addEventListener('click', () => {
+        if (selectedElement()?.type !== 'image') return;
+        refs.elementImageInput.click();
+    });
+    refs.elementImageInput.addEventListener('change', () => {
+        try {
+            const element = selectedElement();
+            const file = refs.elementImageInput.files?.[0];
+            if (!element || element.type !== 'image' || !file) return;
+            setPendingImage(element.id, file);
+            render();
+            setStatus('Изображение выбрано — загрузится при сохранении');
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            refs.elementImageInput.value = '';
+        }
     });
 
     document.getElementById('duplicateButton').addEventListener('click', duplicateSelected);
@@ -631,6 +1054,9 @@
     document.getElementById('previewButton').addEventListener('click', togglePreview);
     document.getElementById('backButton').addEventListener('click', () => { location.href = '/admin.html'; });
     window.addEventListener('resize', updateScale);
+    window.addEventListener('beforeunload', () => {
+        for (const key of [...state.pendingImages.keys()]) clearPendingImage(key);
+    });
 
     loadSlide();
 })();
