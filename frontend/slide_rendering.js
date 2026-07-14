@@ -1,4 +1,86 @@
-﻿// =========================================================
+﻿/*
+
+    Структура полей для объектов elements разных типов:
+
+    {
+        name: "",
+        type: "text",
+        content: "",
+
+        text: {
+            color:
+            textAlign:
+            verticalAlign:
+            fontSize: 
+            fontFamily: 
+            fontWeight: 
+        }
+        layout: {
+            positioning: "absolute" | "relative"
+            x: 
+            y:
+            marging-left:
+            marging-right:
+            marging-top:
+            marging-bottom:
+            align: 
+            z-index: 
+            rotation:
+            opacity:
+            backgroundColor:
+            border:
+            borderColor:
+            borderRadius:
+        }
+    }
+
+
+
+    {
+        name:,
+        type: "image",
+        src: 
+        alt: 
+
+        figure: {
+            width:
+            height:
+            fit:
+        }
+
+        layout: {|см выше|}
+    }
+
+
+
+    {
+        name:
+        type: "metric",
+        chartType: "value" | "bar" | "line"
+        value:
+        chart: {
+            unit:,
+            labels: ["", "", ""],
+            datasets: [{ data: [12, 19, 7] }]
+        }
+        text: |см выше|
+        figure: |см выше|
+        layout: {|см выше|}
+    }
+
+    {
+        name: "",
+        type: "shape",
+        subtype: "rectangle" | "circle" | "triangle"
+        color: ""
+
+        figure: |см выше|
+        layout: {|см выше|}
+    }
+ */
+
+
+// =========================================================
 // RENDER
 // =========================================================
 
@@ -46,7 +128,7 @@ function scaleSlideCanvas(root, canvas) {
     const canvasHeight = Number(config.CANVAS_HEIGHT || 1080);
 
     const rootWidth = root.clientWidth || window.innerWidth;
-    const rootHeight = root.clientHeight || window.innerHeight;
+    const rootHeight = rootWidth * 1080 / 1920 || window.innerHeight;
 
     const scale = Math.min(
         rootWidth / canvasWidth,
@@ -66,7 +148,7 @@ function renderElement(element) {
     if (type === "text") return renderTextElement(element);
     if (type === "image") return renderImageElement(element);
     if (type === "chart" || type === "metric") return renderMetricElement(element);
-    if (type === "badge") return renderBadgeElement(element);
+    if (type === "shape") return renderShapeElement(element);
     return renderTextElement({ ...element, value: element.value ?? "" });
 }
 
@@ -74,14 +156,15 @@ function renderTextElement(element) {
     const node = document.createElement("div");
     node.className = "slide-element slide-text";
     applyRoleClass(node, element.role);
-    applyTextAlignmentClasses(node, element.layout || {});
-    node.textContent = String(element.value ?? element.text ?? "");
-    applyLayout(node, element.layout, {
-        width: 1200,
-        height: 140,
+    applyTextClasses(node, element.text, {
         fontSize: 64,
         color: "#ffffff",
         fontWeight: 700
+    });
+    node.textContent = String(element.value ?? element.text ?? "");
+    applyLayout(node, element.layout, {
+        width: 1200,
+        height: 140
     });
     return node;
 }
@@ -89,8 +172,8 @@ function renderTextElement(element) {
 function renderImageElement(element) {
     const node = document.createElement("div");
     node.className = "slide-element slide-image-element";
-    applyImageClasses(node, element.layout || {}, element.role);
-    applyLayout(node, element.layout, { width: 800, height: 500 });
+    applyShapeClasses(node, element.shape || {}, element.role);
+    applyLayout(node, element.layout);
 
     const src = getImageElementSource(element);
     if (src) {
@@ -105,7 +188,7 @@ function renderImageElement(element) {
 
 function renderMetricElement(element) {
     const chart = element.chart || element.metric || {};
-    const chartType = String(chart.chartType || chart.type || "value").toLowerCase();
+    const chartType = String(element.chartType || "value").toLowerCase();
 
     if (chartType === "value" || (!chart.datasets && element.value !== undefined)) {
         return renderMetricValueElement(element);
@@ -114,7 +197,9 @@ function renderMetricElement(element) {
     const node = document.createElement("div");
     node.className = "slide-element slide-chart";
     applyRoleClass(node, element.role);
-    applyLayout(node, element.layout, { width: 1200, height: 520 });
+    applyLayout(node, element.layout);
+    applyTextClasses(node, element.text);
+    applyShapeClasses(node, element.shape);
 
     const canvas = document.createElement("canvas");
     node.appendChild(canvas);
@@ -130,28 +215,21 @@ function renderMetricValueElement(element) {
     const value = element.value ?? chart.value ?? "—";
     const unit = chart.unit ? " " + chart.unit : "";
     node.textContent = String(value) + unit;
-    applyLayout(node, element.layout, {
-        width: 900,
-        height: 220,
-        fontSize: 150,
-        color: "#d6ffe8",
-        fontWeight: 800
+    applyLayout(node, element.layout);
+    applyTextClasses(node, element.text, {
+        fontSize: 64,
+        color: "#ffffff",
+        fontWeight: 700
     });
     return node;
 }
 
-function renderBadgeElement(element) {
+function renderShapeElement(element) {
     const node = document.createElement("div");
     node.className = "slide-element slide-badge";
     applyRoleClass(node, element.role);
     node.textContent = String(element.value ?? element.text ?? "");
-    applyLayout(node, element.layout, {
-        width: 360,
-        height: 70,
-        fontSize: 30,
-        color: "#ffffff",
-        fontWeight: 700
-    });
+    applyLayout(node, element.layout, {});
     return node;
 }
 
@@ -187,42 +265,59 @@ function applySlideBackground(canvas, background) {
 }
 
 function applyLayout(node, layout = {}, defaults = {}) {
-    const x = safeNumber(layout.x, defaults.x || 0);
-    const y = safeNumber(layout.y, defaults.y || 0);
-    const width = safeNumber(layout.width, defaults.width || 400);
-    const height = safeNumber(layout.height, defaults.height || 100);
+    if (layout.positioning === "relative") {
+        if (layout.align === "left") {
+            node.style.left = "0px";
+        } else if (layout.align === "right") {
+            node.style.right === "0px";
+        } else if (layout.align === "center") {
+            node.style.left = "50%";
+            node.style.transform = 'translateX("-50%")';
+        }
+    } else {
+        const x = safeNumber(layout.x, defaults.x || 0);
+        const y = safeNumber(layout.y, defaults.y || 0);
+        node.style.left = x + "px";
+        node.style.top = y + "px";
+    };
 
-    node.style.left = x + "px";
-    node.style.top = y + "px";
-    node.style.width = width + "px";
-    node.style.height = height + "px";
+    const marginTop = safeNumber(layout.marginTop, defaults.marginTop || 0);
+    const marginBottom = safeNumber(layout.marginBottom, defaults.marginBottom || 0);
+    const marginLeft = safeNumber(layout.marginLeft, defaults.marginLeft || 0);
+    const marginRight = safeNumber(layout.marginRight, defaults.marginRight || 0);
+    node.style.marginTop = marginTop + "px";
+    node.style.marginBottom = marginBottom + "px";
+    node.style.marginLeft = marginLeft + "px";
+    node.style.marginRight = marginRight + "px";
+    
     node.style.zIndex = String(safeInteger(layout.zIndex, defaults.zIndex || 1));
 
-    if (layout.fontSize !== undefined || defaults.fontSize !== undefined) node.style.fontSize = safeNumber(layout.fontSize, defaults.fontSize) + "px";
-    if (layout.fontWeight !== undefined || defaults.fontWeight !== undefined) node.style.fontWeight = String(layout.fontWeight || defaults.fontWeight);
-    if (layout.color !== undefined || defaults.color !== undefined) node.style.color = isSafeCssColor(layout.color) ? layout.color : defaults.color;
+    if (layout.rotation !== undefined) node.style.transform = rotate(safeNumber(layout.borderRadius, 0) + "deg");
     if (layout.backgroundColor && isSafeCssColor(layout.backgroundColor)) node.style.backgroundColor = layout.backgroundColor;
+    if (layout.border !== undefined) node.style.border = safeNumber(layout.border, 0) + "px";
     if (layout.borderColor && isSafeCssColor(layout.borderColor)) node.style.borderColor = layout.borderColor;
     if (layout.borderRadius !== undefined) node.style.borderRadius = safeNumber(layout.borderRadius, 0) + "px";
     if (layout.opacity !== undefined) node.style.opacity = String(Math.max(0, Math.min(1, safeNumber(layout.opacity, 1))));
-    if (layout.lineHeight !== undefined) node.style.lineHeight = String(layout.lineHeight);
-    if (layout.padding !== undefined) node.style.padding = safeNumber(layout.padding, 0) + "px";
 }
 
-function applyTextAlignmentClasses(node, layout) {
-    const align = String(layout.textAlign || "center").toLowerCase();
-    const valign = String(layout.verticalAlign || "middle").toLowerCase();
+function applyTextClasses(node, text, defaults = {}) {
+    const align = String(text.textAlign || "center").toLowerCase();
+    const valign = String(text.verticalAlign || "middle").toLowerCase();
     node.classList.add(["left", "center", "right"].includes(align) ? "align-" + align : "align-center");
     node.classList.add(["top", "middle", "bottom"].includes(valign) ? "valign-" + valign : "valign-middle");
+    if (text.fontSize !== undefined || defaults.fontSize !== undefined) node.style.fontSize = safeNumber(text.fontSize, defaults.fontSize) + "px";
+    if (text.fontWeight !== undefined || defaults.fontWeight !== undefined) node.style.fontWeight = String(text.fontWeight || defaults.fontWeight);
+    if (text.color !== undefined || defaults.color !== undefined) node.style.color = isSafeCssColor(text.color) ? text.color : defaults.color;
+    if (text.fontFamily !== undefined || defaults.fontFamily !== undefined) node.style.fontFamily = (text.fontFamily || defaults.fontFamily);
 }
 
-function applyImageClasses(node, layout, role) {
-    const fit = String(layout.fit || "contain").toLowerCase();
-    const shape = String(layout.shape || "").toLowerCase();
+function applyShapeClasses(node, image, role) {
+    const fit = String(image.fit || "contain").toLowerCase();
+    const shape = String(image.shape || "").toLowerCase();
     if (["cover", "fill"].includes(fit)) node.classList.add("fit-" + fit);
     if (["rounded", "circle"].includes(shape)) node.classList.add("shape-" + shape);
     if (role === "photo" || role === "person_photo") node.classList.add("shape-circle", "shadow-soft");
-    if (layout.shadow) node.classList.add("shadow-soft");
+    if (image.shadow) node.classList.add("shadow-soft");
 }
 
 function applyRoleClass(node, role) {

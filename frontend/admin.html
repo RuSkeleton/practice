@@ -633,25 +633,26 @@
             var kind = document.getElementById("slideKind").value;
             if (kind === "image") {
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Текст", layout: { x: 160, y: 80, width: 1600, height: 100, fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "image", type: "image", role: "main_image", src: "https://static.1000.menu/img/content-v2/97/7b/36007/prostoi-i-vkusnyi-shokoladnyi-tort_1762166750_0_w9vmk7h_max.jpg", alt: "Описание изображения", layout: { x: 420, y: 220, width: 780, height: 640, objectFit: "fill", zIndex: 2 } }
+                    { id: "title", type: "text", role: "title", value: "Текст", text: { fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 160, y: 80, align: "center", zIndex: 2} },
+                    { id: "image", type: "image", role: "main_image", src: "https://static.1000.menu/img/content-v2/97/7b/36007/prostoi-i-vkusnyi-shokoladnyi-tort_1762166750_0_w9vmk7h_max.jpg", alt: "Описание изображения", shape: { width: 780, height: 640, objectFit: "fill"}, layout: { positioning: "relative", x: 420, y: 220, align: "center", zIndex: 2} }
                 ];
             } else if (kind === "greeting") {
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Поздравляем!", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "name", type: "text", role: "person_name", value: "ФИО", layout: { x: 220, y: 330, width: 1480, height: 120, fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: "Повод для праздника", layout: { x: 260, y: 520, width: 1400, height: 220, fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                    { id: "title", type: "text", role: "title", value: "Поздравляем!", text: { fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 160, y: 120, align: "center", zIndex: 2 } },
+                    { id: "name", type: "text", role: "person_name", value: "ФИО", text: { fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 220, y: 230, align: "center", zIndex: 2 } },
+                    { id: "body", type: "text", role: "body", value: "Повод для праздника", text: { fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle" }, layout: { positioning: "relative", x: 260, y: 520, align: "center", zIndex: 2 } }
                 ];
             } else if (kind === "metric") {
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Х", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "value", type: "text", role: "metric_value", value: "условных единиц" || "—", layout: { x: 260, y: 350, width: 1400, height: 220, fontSize: 96, fontWeight: 800, color: "#d6ffe8", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                    { id: "title", type: "text", role: "title", value: "Годовой отчет 2025", text: { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", "fontSize": 64, "fontFamily": "Arial", "fontWeight": 800 }, "layout": { "positioning": "relative", "x": 160, "y": 120, "zIndex": 2 } },
+                    { "id": "metric1", "type": "metric", "chartType": "line", "value": 87, "chart": { "unit": "%", "labels": ["Янв", "Фев", "Мар"], "datasets": [10, 20, 15] }, "text": { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", "fontSize": 48, "fontFamily": "Arial", "fontWeight": 700 }, "shape": { "width": 300, "height": 150, "fit": "contain" }, "layout": { "positioning": "absolute", "x": 810, "y": 340, "zIndex": 2 } },
+                    { "id": "body", "type": "text", "role": "body", "value": "Все молодцы", "text": { "textColor": "#e0e0e0", "textAlign": "center", "verticalAlign": "middle", "fontSize": 42, "fontFamily": "Arial", "fontWeight": 400 }, "layout": { "positioning": "absolute", "x": 220, "y": 540, "zIndex": 2 } }
                 ];
             } else if (kind === "announcement") {
                 // announcement
                 els = [
-                    { id: "title", type: "text", role: "title", value: "Заголовок", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: "Текст", layout: { x: 220, y: 320, width: 1480, height: 420, fontSize: 42, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
+                    { id: "title", "type": "text", "role": "title", "value": "Заголовок", "text": { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", fontSize: 64, "fontWeight": 800 }, "layout": { "x": 160, "y": 120, "zIndex": 2 } },
+                    { "id": "body", "type": "text", "role": "body", "value": "Текст", "text": { "textColor": "#ffffff", "textAlign": "center", "verticalAlign": "middle", "fontSize": 42 }, "layout": { "x": 220, "y": 320, "zIndex": 2 } }
                 ];
             }
             return els;
@@ -1178,8 +1179,8 @@
 
         function fillTextFormWithValues(textform, element) {
             textform.querySelector("#text-content").value = element.value;
-            textform.querySelector("#text-size").value = element.layout.fontSize;
-            textform.querySelector("#text-color").value = element.layout.color;
+            textform.querySelector("#text-size").value = element.text.fontSize;
+            textform.querySelector("#text-color").value = element.text.color;
         }
 
         function fillImageFormWithValues(imageform, element) {
