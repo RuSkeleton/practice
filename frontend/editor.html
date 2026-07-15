@@ -816,12 +816,18 @@
         event.preventDefault();
         event.stopPropagation();
 
-        selectElement(element.id, node);
+        // Не вызываем selectElement повторно для уже выбранного элемента.
+        // selectElement удаляет и создаёт resize-маркеры заново, поэтому
+        // исходный маркер исчезал прямо во время pointerdown.
+        if (state.selectedElementId !== element.id || !node.classList.contains('selected')) {
+            selectElement(element.id, node);
+        }
 
         const layout = element.layout ||= {};
         const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH || 1;
         const startClientX = event.clientX;
         const startClientY = event.clientY;
+        const pointerId = event.pointerId;
         const start = {
             x: Number(layout.x || 0),
             y: Number(layout.y || 0),
@@ -830,12 +836,12 @@
         };
         const minWidth = 40;
         const minHeight = 40;
-        const handle = event.currentTarget;
+        const resizeCursor = getComputedStyle(event.currentTarget).cursor;
         let changed = false;
 
-        handle.setPointerCapture(event.pointerId);
-
         const onMove = moveEvent => {
+            if (moveEvent.pointerId !== pointerId) return;
+
             const deltaX = (moveEvent.clientX - startClientX) / scale;
             const deltaY = (moveEvent.clientY - startClientY) / scale;
 
@@ -878,16 +884,23 @@
             changed = true;
         };
 
-        const onEnd = () => {
-            handle.removeEventListener('pointermove', onMove);
-            handle.removeEventListener('pointerup', onEnd);
-            handle.removeEventListener('pointercancel', onEnd);
+        const onEnd = endEvent => {
+            if (endEvent.pointerId !== pointerId) return;
+
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onEnd);
+            window.removeEventListener('pointercancel', onEnd);
+            document.body.style.cursor = '';
+
             if (changed) setStatus('Изменено');
         };
 
-        handle.addEventListener('pointermove', onMove);
-        handle.addEventListener('pointerup', onEnd);
-        handle.addEventListener('pointercancel', onEnd);
+        // Слушаем окно, а не сам маркер: resize продолжает работать,
+        // даже если курсор ушёл за его пределы.
+        document.body.style.cursor = resizeCursor;
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onEnd);
+        window.addEventListener('pointercancel', onEnd);
     }
 
     function applyElementLayout(node, element) {
