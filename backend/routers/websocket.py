@@ -1,4 +1,4 @@
-"""WebSocket экранов с обязательной аутентификацией device token."""
+"""WebSocket-каналы экранов и административной панели."""
 
 from __future__ import annotations
 
@@ -7,10 +7,13 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from backend import auth
+from backend.config import config
 from backend.database import SessionLocal
-from backend.models import Screen, SystemSetting
+from backend.models import Screen, SystemSetting, User
 from backend.screen_auth import get_screen_by_token
 
 
@@ -19,6 +22,7 @@ router = APIRouter()
 SCHEDULE_VERSION_KEY = "schedule_version"
 PING_INTERVAL_SECONDS = 30
 PING_TIMEOUT_SECONDS = 90
+ADMIN_AUTH_TIMEOUT_SECONDS = 10
 
 
 def _utc_now() -> datetime:
@@ -93,7 +97,35 @@ class ScreenConnectionManager:
             await self.send_to_screen(screen_code, message)
 
 
+class AdminConnectionManager:
+    """Хранит WebSocket-соединения авторизованных HR/admin-пользователей."""
+
+    def __init__(self) -> None:
+        self._connections: set[WebSocket] = set()
+
+    def register(self, websocket: WebSocket) -> None:
+        self._connections.add(websocket)
+
+    def unregister(self, websocket: WebSocket) -> None:
+        self._connections.discard(websocket)
+
+    async def send(self, websocket: WebSocket, message: dict[str, Any]) -> bool:
+        if websocket not in self._connections:
+            return False
+        try:
+            await websocket.send_json(message)
+            return True
+        except Exception:
+            self.unregister(websocket)
+            return False
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        for websocket in list(self._connections):
+            await self.send(websocket, message)
+
+
 manager = ScreenConnectionManager()
+admin_manager = AdminConnectionManager()
 
 
 def _find_screen(db: Session, code: str) -> Optional[Screen]:
@@ -121,12 +153,63 @@ def _mark_screen_offline_by_code(screen_code: Optional[str]) -> None:
         db.close()
 
 
+def _authenticate_admin_access_token(token: str) -> Optional[tuple[int, str]]:
+    """Проверяет тот же access JWT, который используется HTTP API.
+
+    JWT не передаётся в URL, чтобы он не попадал в access-логи. Клиент
+    отправляет его первым JSON-сообщением после установки соединения.
+    """
+
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(
+            token,
+            config.SECRET_KEY,
+            algorithms=[config.ALGORITHM],
+        )
+        if payload.get("type") != "access":
+            return None
+
+        user_id = int(payload.get("sub"))
+        token_version = int(payload.get("ver"))
+    except (JWTError, TypeError, ValueError):
+        return None
+
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if user is None:
+            return None
+        if token_version != int(user.auth_version or 1):
+            return None
+        if not user.is_active:
+            return None
+        if user.role not in {auth.ROLE_HR, auth.ROLE_ADMIN}:
+            return None
+        return user.id, user.role
+    finally:
+        db.close()
+
+
 async def _send_register_failed(websocket: WebSocket, message: str) -> None:
     await websocket.send_json(
         {
             "type": "register_failed",
             "ok": False,
             "error": "screen_auth_failed",
+            "message": message,
+        }
+    )
+
+
+async def _send_admin_auth_failed(websocket: WebSocket, message: str) -> None:
+    await websocket.send_json(
+        {
+            "type": "auth_failed",
+            "ok": False,
+            "error": "admin_auth_failed",
             "message": message,
         }
     )
@@ -269,6 +352,114 @@ async def screens_websocket(websocket: WebSocket) -> None:
         _mark_screen_offline_by_code(disconnected_code)
 
 
+@router.websocket("/ws/admin")
+async def admin_websocket(websocket: WebSocket) -> None:
+    """Push-уведомления для открытой административной панели.
+
+    Первое сообщение должно иметь вид:
+    {"type": "authenticate", "token": "<access JWT>"}
+    """
+
+    await websocket.accept()
+    is_registered = False
+    last_seen = datetime.now(timezone.utc)
+
+    try:
+        try:
+            first_message = await asyncio.wait_for(
+                websocket.receive_json(),
+                timeout=ADMIN_AUTH_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            await _send_admin_auth_failed(
+                websocket,
+                "Не получены данные авторизации",
+            )
+            await websocket.close(code=1008)
+            return
+
+        if str(first_message.get("type") or "").lower() != "authenticate":
+            await _send_admin_auth_failed(
+                websocket,
+                "Первым сообщением должен быть authenticate",
+            )
+            await websocket.close(code=1008)
+            return
+
+        admin_token = str(first_message.get("token") or "")
+        authenticated_user = _authenticate_admin_access_token(admin_token)
+        if authenticated_user is None:
+            await _send_admin_auth_failed(
+                websocket,
+                "Не удалось подтвердить учётные данные",
+            )
+            await websocket.close(code=1008)
+            return
+
+        user_id, role = authenticated_user
+        admin_manager.register(websocket)
+        is_registered = True
+
+        await websocket.send_json(
+            {
+                "type": "authenticated",
+                "ok": True,
+                "user_id": user_id,
+                "role": role,
+                "server_time": _iso_z(),
+            }
+        )
+
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    websocket.receive_json(),
+                    timeout=PING_INTERVAL_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                await websocket.send_json(
+                    {
+                        "type": "ping",
+                        "server_time": _iso_z(),
+                    }
+                )
+
+                age = (
+                    datetime.now(timezone.utc) - last_seen
+                ).total_seconds()
+                if age > PING_TIMEOUT_SECONDS:
+                    await websocket.close(code=1001)
+                    return
+                continue
+
+            last_seen = datetime.now(timezone.utc)
+            message_type = str(message.get("type") or "").lower()
+
+            if message_type == "pong":
+                # Проверяем не только срок JWT, но и auth_version,
+                # is_active и актуальную роль пользователя. Поэтому смена
+                # пароля или отключение аккаунта закрывает живой WebSocket.
+                if _authenticate_admin_access_token(admin_token) is None:
+                    await _send_admin_auth_failed(
+                        websocket,
+                        "Сессия больше не действительна",
+                    )
+                    await websocket.close(code=1008)
+                    return
+                continue
+
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+    finally:
+        if is_registered:
+            admin_manager.unregister(websocket)
+
+
 async def notify_schedule_updated(
     *,
     mode: str = "full",
@@ -298,14 +489,18 @@ async def notify_slides_updated(
     slide_ids: list[int | str],
     reason: str = "slide_content_updated",
 ) -> None:
-    await manager.broadcast(
-        {
-            "type": "slides_updated",
-            "slide_ids": [str(slide_id) for slide_id in slide_ids],
-            "reason": reason,
-            "server_time": _iso_z(),
-        }
-    )
+    message = {
+        "type": "slides_updated",
+        "slide_ids": [str(slide_id) for slide_id in slide_ids],
+        "reason": reason,
+        "server_time": _iso_z(),
+    }
+
+    # Экран получает событие и точечно догружает изменившиеся слайды.
+    await manager.broadcast(message)
+
+    # Админ-панель получает то же событие и перечитывает каталог через REST.
+    await admin_manager.broadcast(message)
 
 
 async def notify_screen_disabled(
