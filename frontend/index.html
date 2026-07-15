@@ -670,10 +670,13 @@
         }
 
         function handleSlidesUpdatedEvent(message) {
-            const ids = Array.isArray(message.slide_ids) ? message.slide_ids.map(id => String(id)) : [];
-            const usedIds = new Set(extractSlideIdsFromSchedule(state.schedule));
-            const relevantIds = ids.length > 0 ? ids.filter(id => usedIds.has(String(id))) : [...usedIds];
-            if (relevantIds.length > 0) refreshSlidesByIds(relevantIds, { renderAfter: true });
+            const ids = Array.isArray(message.slide_ids)
+                ? message.slide_ids.map(id => String(id))
+                : [];
+
+            if (ids.length > 0) {
+                refreshSlidesByIds(ids, { renderAfter: true });
+            }
         }
 
         function sendWebSocketMessage(payload) {
@@ -776,7 +779,7 @@
                 state.lastFullSyncAt = new Date().toISOString();
                 applyFullSchedule(schedule);
 
-                await loadMissingSlidesForSchedule(state.schedule);
+                await refreshSlidesForSchedule(state.schedule);
                 await persistCurrentSlidesAndImages();
                 updateStatusUi();
                 renderCurrentSlide(true);
@@ -808,7 +811,7 @@
                 state.scheduleSavedAt = new Date().toISOString();
                 saveScheduleCache(state.schedule, state.scheduleSavedAt);
 
-                await loadMissingSlidesForSchedule(state.schedule);
+                await refreshSlidesForSchedule(state.schedule);
                 await persistCurrentSlidesAndImages();
                 updateStatusUi();
                 renderCurrentSlide(true);
@@ -955,10 +958,15 @@
         // SLIDE LOADER
         // =========================================================
 
-        async function loadMissingSlidesForSchedule(schedule) {
+        async function refreshSlidesForSchedule(schedule) {
             const ids = extractSlideIdsFromSchedule(schedule);
-            const missing = ids.filter(id => !state.slidesById.has(String(id)));
-            if (missing.length > 0) await refreshSlidesByIds(missing, { renderAfter: false, persistAfter: false });
+
+            if (ids.length > 0) {
+                await refreshSlidesByIds(ids, {
+                    renderAfter: false,
+                    persistAfter: false
+                });
+            }
         }
 
         async function refreshSlidesByIds(ids, options = {}) {
