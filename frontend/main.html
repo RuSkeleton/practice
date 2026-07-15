@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -15,19 +16,40 @@
             align-items: center;
             color: #fff;
         }
-        .login-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; padding: 20px; }
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 20px;
+        }
         .login-box {
             background: #16213e;
             padding: 50px 60px;
             border-radius: 24px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-            max-width: 420px;
+            max-width: 440px;
             width: 100%;
         }
-        .login-box h1 { font-size: 1.8em; color: #4a9eff; text-align: center; margin-bottom: 8px; }
-        .login-box .subtitle { font-size: 1em; color: #6a7a9a; text-align: center; margin-bottom: 30px; }
+        .login-box h1 {
+            font-size: 1.8em;
+            color: #4a9eff;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .login-box .subtitle {
+            font-size: 1em;
+            color: #6a7a9a;
+            text-align: center;
+            margin-bottom: 30px;
+        }
         .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 6px; color: #a0b4d0; font-size: 14px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #a0b4d0;
+            font-size: 14px;
+        }
         .form-group input {
             width: 100%;
             padding: 12px 16px;
@@ -38,23 +60,52 @@
             font-size: 16px;
         }
         .form-group input:focus { outline: none; border-color: #4a9eff; }
-        .btn-primary {
+        .btn-primary,
+        .btn-secondary {
             width: 100%;
             padding: 14px;
-            background: #4a9eff;
             color: #fff;
             border: none;
             border-radius: 8px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             margin-top: 8px;
         }
+        .btn-primary { background: #4a9eff; font-size: 18px; }
         .btn-primary:hover { background: #3a7ecc; }
-        .login-message { margin-top: 16px; padding: 10px; border-radius: 6px; text-align: center; font-size: 14px; }
+        .btn-primary:disabled { opacity: 0.65; cursor: wait; }
+        .btn-secondary { background: #2a3a5e; }
+        .btn-secondary:hover { background: #3a4a6e; }
+        .login-message {
+            min-height: 18px;
+            margin-top: 16px;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .login-message:empty { padding: 0; }
         .login-message.error { background: #3a1a1a; color: #ff6b6b; }
         .login-message.success { background: #1a3a2a; color: #7ddfa0; }
-        .login-footer { margin-top: 20px; text-align: center; color: #4a5a7a; font-size: 13px; }
+        .login-footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #4a5a7a;
+            font-size: 13px;
+        }
+        .dev-box {
+            display: none;
+            margin-top: 18px;
+            padding: 12px;
+            border: 1px solid #725c1d;
+            border-radius: 8px;
+            background: #2a2210;
+            color: #ffd36a;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .dev-box strong { color: #fff0a8; }
     </style>
 </head>
 <body>
@@ -62,55 +113,169 @@
         <div class="login-box">
             <h1>Цифровые информационные панели</h1>
             <p class="subtitle">Вход в систему</p>
+
             <form id="loginForm">
                 <div class="form-group">
                     <label for="username">Логин</label>
-                    <input type="text" id="username" placeholder="Введите логин" value="hr" required />
+                    <input
+                        type="text"
+                        id="username"
+                        placeholder="Введите логин"
+                        autocomplete="username"
+                        maxlength="50"
+                        required
+                    />
                 </div>
                 <div class="form-group">
                     <label for="password">Пароль</label>
-                    <input type="password" id="password" placeholder="Введите пароль" value="12345" required />
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="Введите пароль"
+                        autocomplete="current-password"
+                        maxlength="128"
+                        required
+                    />
                 </div>
-                <button type="submit" class="btn-primary">Войти</button>
-                <div id="loginMessage" class="login-message"></div>
+                <button id="loginButton" type="submit" class="btn-primary">Войти</button>
+                <div id="loginMessage" class="login-message" aria-live="polite"></div>
             </form>
-            <div class="login-footer">Демо-доступ: HR / 12345</div>
+
+            <div id="devBox" class="dev-box">
+                <div>
+                    <strong>Dev-режим включён.</strong>
+                    Демо-реквизиты выдаются сервером только при явном
+                    SHOW_DEV_LOGIN_HINTS=true.
+                </div>
+                <button
+                    type="button"
+                    id="fillDevCredentialsBtn"
+                    class="btn-secondary"
+                >
+                    Заполнить dev-доступ
+                </button>
+            </div>
+
+            <div class="login-footer">
+                Для доступа обратитесь к администратору системы
+            </div>
         </div>
     </div>
+
     <script>
-        const API_BASE = window.location.origin + '/api';
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const msg = document.getElementById('loginMessage');
+        "use strict";
+
+        const API_BASE = window.location.origin + "/api";
+        const TOKEN_KEY = "access_token";
+
+        const loginForm = document.getElementById("loginForm");
+        const loginButton = document.getElementById("loginButton");
+        const loginMessage = document.getElementById("loginMessage");
+        const usernameInput = document.getElementById("username");
+        const passwordInput = document.getElementById("password");
+        const devBox = document.getElementById("devBox");
+        const fillDevCredentialsBtn = document.getElementById("fillDevCredentialsBtn");
+
+        let devCredentials = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // Старый проект сохранял token в localStorage. Удаляем его, чтобы
+            // случайно не использовать бессрочно лежащий legacy-токен.
+            localStorage.removeItem("token");
+
+            if (sessionStorage.getItem(TOKEN_KEY)) {
+                window.location.replace("admin.html");
+                return;
+            }
+
+            loadPublicConfig();
+            usernameInput.focus();
+        });
+
+        async function loadPublicConfig() {
+            try {
+                const response = await fetch(API_BASE + "/public-config", {
+                    cache: "no-store"
+                });
+                if (!response.ok) return;
+
+                const publicConfig = await response.json();
+                if (
+                    publicConfig.show_dev_login_hints &&
+                    publicConfig.dev_username &&
+                    publicConfig.dev_password
+                ) {
+                    devCredentials = {
+                        username: publicConfig.dev_username,
+                        password: publicConfig.dev_password
+                    };
+                    devBox.style.display = "block";
+                }
+            } catch (_) {
+                // Не блокируем обычный вход, если informational endpoint недоступен.
+            }
+        }
+
+        fillDevCredentialsBtn.addEventListener("click", () => {
+            if (!devCredentials) return;
+            usernameInput.value = devCredentials.username;
+            passwordInput.value = devCredentials.password;
+            passwordInput.focus();
+        });
+
+        loginForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            setLoginMessage("", "");
+            loginButton.disabled = true;
 
             try {
-                const formData = new FormData();
-                formData.append('username', username);
-                formData.append('password', password);
+                // OAuth2PasswordRequestForm ожидает form-urlencoded данные.
+                const formData = new URLSearchParams();
+                formData.set("username", usernameInput.value.trim());
+                formData.set("password", passwordInput.value);
 
-                const response = await fetch(API_BASE + '/login', {
-                    method: 'POST',
-                    body: formData
+                const response = await fetch(API_BASE + "/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: formData.toString(),
+                    cache: "no-store"
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem('token', data.access_token);
-                    msg.textContent = 'Успешный вход! Перенаправление...';
-                    msg.className = 'login-message success';
-                    setTimeout(() => { window.location.href = 'admin.html'; }, 800);
-                } else {
-                    const error = await response.json();
-                    msg.textContent = 'Ошибка: ' + (error.detail || 'Неверный логин или пароль');
-                    msg.className = 'login-message error';
+                if (!response.ok) {
+                    let detail = "Неверный логин или пароль";
+                    try {
+                        const error = await response.json();
+                        detail = error.detail || detail;
+                    } catch (_) {}
+                    throw new Error(detail);
                 }
+
+                const data = await response.json();
+
+                // sessionStorage живёт до закрытия вкладки/окна. Это не заменяет
+                // HttpOnly cookie, но безопаснее прежнего постоянного localStorage.
+                sessionStorage.setItem(TOKEN_KEY, data.access_token);
+
+                setLoginMessage("Успешный вход. Перенаправление...", "success");
+                window.setTimeout(() => {
+                    window.location.replace("admin.html");
+                }, 250);
             } catch (error) {
-                msg.textContent = 'Ошибка подключения к серверу';
-                msg.className = 'login-message error';
+                setLoginMessage(
+                    "Ошибка: " + (error.message || "не удалось выполнить вход"),
+                    "error"
+                );
+            } finally {
+                loginButton.disabled = false;
             }
         });
+
+        function setLoginMessage(text, type) {
+            loginMessage.textContent = text;
+            loginMessage.className = "login-message" + (type ? " " + type : "");
+        }
     </script>
 </body>
 </html>

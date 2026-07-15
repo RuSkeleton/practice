@@ -1,34 +1,28 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
 .pytest_cache/
 .mypy_cache/
 
-# Virtual environment
+# Virtual environments / IDE
 .venv/
 venv/
-env/
-
-# Environment
-.env
-
-# IDE
 .idea/
 .vscode/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime data
+*.log
+data/*.db
+data/*.db-shm
+data/*.db-wal
+uploads/*
+!uploads/.gitkeep
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
-
-# SQLite runtime DB
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-
-# Uploads / generated files, если есть
-uploads/

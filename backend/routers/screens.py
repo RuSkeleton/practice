@@ -1,17 +1,25 @@
-# backend/api/screens.py
-# Роуты экранного клиента: активация, получение расписания, догрузка слайдов.
+"""REST-протокол экранного клиента.
+
+Публичным остаётся только POST /screens/activate: он одноразово обменивает
+короткоживущий pairing code на случайный device token. Все остальные маршруты
+требуют заголовок X-Screen-Token и получают экран из проверенного токена, а не
+из присланного клиентом кода.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.config import config
 from backend.database import get_db
 from backend.models import ScheduleWindow, Screen, Slide, SystemSetting
+from backend.rate_limit import SlidingWindowRateLimiter
+from backend.screen_auth import issue_screen_token, require_screen, utc_now_naive
 
 
 router = APIRouter()
@@ -20,18 +28,27 @@ SCHEDULE_VERSION_KEY = "schedule_version"
 FALLBACK_SLIDE_ID = 0
 DEFAULT_WINDOW_SIZE_SECONDS = 3600
 
+_activation_limiter = SlidingWindowRateLimiter(
+    max_attempts=config.SCREEN_ACTIVATION_MAX_FAILED_ATTEMPTS_PER_IP,
+    window_seconds=config.SCREEN_ACTIVATION_RATE_LIMIT_WINDOW_SECONDS,
+)
+
 
 class ScreenActivateRequest(BaseModel):
-    code: str = Field(..., min_length=3, max_length=3, pattern=r"^[0-9]{3}$")
+    code: str = Field(
+        ...,
+        min_length=config.SCREEN_PAIRING_CODE_LENGTH,
+        max_length=config.SCREEN_PAIRING_CODE_LENGTH,
+        pattern=rf"^[0-9]{{{config.SCREEN_PAIRING_CODE_LENGTH}}}$",
+    )
 
 
 class SlidesBatchRequest(BaseModel):
-    ids: list[int | str] = Field(default_factory=list)
+    ids: list[int | str] = Field(default_factory=list, max_length=500)
 
 
 def _utc_now() -> datetime:
-    # В БД пока используем naive UTC, наружу отдаём ISO с Z.
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return utc_now_naive()
 
 
 def _to_db_datetime(value: datetime) -> datetime:
@@ -64,8 +81,6 @@ def _screen_payload(screen: Screen) -> dict[str, Any]:
         "id": screen.id,
         "code": screen.code,
         "name": screen.name or f"Экран {screen.code}",
-        # В текущей модели отдельного is_enabled нет.
-        # Временно считаем is_connected признаком разрешённого/подключённого экрана.
         "is_enabled": bool(screen.is_connected),
     }
 
@@ -86,38 +101,19 @@ def _serialize_slide(slide: Slide) -> dict[str, Any]:
         "start_date": _iso_z(slide.start_date),
         "end_date": _iso_z(slide.end_date),
         "is_active": bool(slide.is_active),
-        "background": slide.background or {"type": "gradient", "value": "default"},
+        "background": slide.background or {
+            "type": "gradient",
+            "value": "default",
+        },
         "elements": slide.elements or [],
     }
 
 
-def _find_screen_by_code(db: Session, code: str) -> Screen:
-    screen = db.query(Screen).filter(Screen.code == code).one_or_none()
-    if screen is None:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "ok": False,
-                "error": "screen_not_found",
-                "message": "Экран с указанным кодом не найден",
-            },
-        )
-    return screen
-
-
-def _ensure_screen_enabled(screen: Screen) -> None:
-    if not screen.is_connected:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "ok": False,
-                "error": "screen_disabled",
-                "message": "Экран отключён или ещё не подключён администратором",
-            },
-        )
-
-
-def _get_windows(db: Session, range_from: datetime, range_to: datetime) -> list[ScheduleWindow]:
+def _get_windows(
+    db: Session,
+    range_from: datetime,
+    range_to: datetime,
+) -> list[ScheduleWindow]:
     return (
         db.query(ScheduleWindow)
         .filter(
@@ -129,15 +125,68 @@ def _get_windows(db: Session, range_from: datetime, range_to: datetime) -> list[
     )
 
 
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _raise_if_activation_limited(ip_key: str) -> None:
+    state = _activation_limiter.check(ip_key)
+    if state.allowed:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Слишком много попыток привязки. Повторите позже",
+        headers={"Retry-After": str(state.retry_after_seconds)},
+    )
+
+
+def _invalid_pairing_response() -> HTTPException:
+    # Один ответ для отсутствующего, просроченного, уже использованного и
+    # отключённого кода не позволяет перечислять состояние экранов.
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Код привязки недействителен или истёк",
+    )
+
+
 @router.post("/screens/activate")
-def activate_screen(payload: ScreenActivateRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
-    screen = _find_screen_by_code(db, payload.code)
-    _ensure_screen_enabled(screen)
+def activate_screen(
+    payload: ScreenActivateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    ip_key = _client_ip(request)
+    _raise_if_activation_limited(ip_key)
 
-    screen.is_online = True
-    screen.last_active = _utc_now()
-    db.commit()
+    screen = (
+        db.query(Screen)
+        .filter(Screen.code == payload.code)
+        .one_or_none()
+    )
+    if screen is None:
+        _activation_limiter.record_failure(ip_key)
+        raise _invalid_pairing_response()
 
+    try:
+        raw_token = issue_screen_token(db, screen)
+    except ValueError:
+        _activation_limiter.record_failure(ip_key)
+        raise _invalid_pairing_response()
+
+    _activation_limiter.reset(ip_key)
+    return {
+        "ok": True,
+        "screen": _screen_payload(screen),
+        "screen_token": raw_token,
+        "token_type": "screen",
+        "server_time": _iso_z(_utc_now()),
+    }
+
+
+@router.get("/screen/me")
+def get_current_screen_info(
+    screen: Screen = Depends(require_screen),
+) -> dict[str, Any]:
     return {
         "ok": True,
         "screen": _screen_payload(screen),
@@ -154,9 +203,10 @@ def get_screen_schedule(
     to_: Optional[datetime] = Query(default=None, alias="to"),
     base_version: Optional[int] = Query(default=None, ge=0),
     db: Session = Depends(get_db),
+    screen: Screen = Depends(require_screen),
 ) -> dict[str, Any]:
-    screen = _find_screen_by_code(db, code)
-    _ensure_screen_enabled(screen)
+    if code != screen.code:
+        raise HTTPException(status_code=403, detail="Токен принадлежит другому экрану")
 
     now = _utc_now()
     current_version = _get_schedule_version(db)
@@ -166,11 +216,17 @@ def get_screen_schedule(
         range_to = now + timedelta(days=days)
     else:
         if from_ is None or to_ is None:
-            raise HTTPException(status_code=400, detail="Patch schedule requires from and to")
+            raise HTTPException(
+                status_code=400,
+                detail="Patch schedule requires from and to",
+            )
         range_from = _to_db_datetime(from_)
         range_to = _to_db_datetime(to_)
         if range_to <= range_from:
-            raise HTTPException(status_code=400, detail="Patch to must be greater than from")
+            raise HTTPException(
+                status_code=400,
+                detail="Patch to must be greater than from",
+            )
 
     windows = _get_windows(db, range_from, range_to)
     window_size_seconds = (
@@ -189,28 +245,34 @@ def get_screen_schedule(
     }
 
     if mode == "full":
-        response.update({
-            "valid_from": _iso_z(range_from),
-            "valid_to": _iso_z(range_to),
-        })
+        response.update(
+            {
+                "valid_from": _iso_z(range_from),
+                "valid_to": _iso_z(range_to),
+            }
+        )
     else:
-        # Если клиент отстал не на одну версию, он сам уйдёт в full sync,
-        # потому что previous_schedule_version не совпадёт с локальной версией.
         previous_version = current_version - 1 if current_version > 0 else 0
         if base_version is not None and base_version == previous_version:
             previous_version = base_version
 
-        response.update({
-            "previous_schedule_version": previous_version,
-            "patch_from": _iso_z(range_from),
-            "patch_to": _iso_z(range_to),
-        })
+        response.update(
+            {
+                "previous_schedule_version": previous_version,
+                "patch_from": _iso_z(range_from),
+                "patch_to": _iso_z(range_to),
+            }
+        )
 
     return response
 
 
 @router.post("/slides/batch")
-def get_slides_batch(payload: SlidesBatchRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_slides_batch(
+    payload: SlidesBatchRequest,
+    db: Session = Depends(get_db),
+    _: Screen = Depends(require_screen),
+) -> dict[str, Any]:
     requested_ids: list[int] = []
     for raw_id in payload.ids:
         try:
@@ -218,7 +280,6 @@ def get_slides_batch(payload: SlidesBatchRequest, db: Session = Depends(get_db))
         except (TypeError, ValueError):
             continue
 
-        # 0 зарезервирован под локальную заглушку клиента и не ходит в БД.
         if slide_id == FALLBACK_SLIDE_ID:
             continue
         if slide_id > 0 and slide_id not in requested_ids:
@@ -235,7 +296,15 @@ def get_slides_batch(payload: SlidesBatchRequest, db: Session = Depends(get_db))
     slides_by_id = {int(slide.id): slide for slide in slides}
 
     return {
-        "slides": [_serialize_slide(slides_by_id[slide_id]) for slide_id in requested_ids if slide_id in slides_by_id],
-        "missing_ids": [str(slide_id) for slide_id in requested_ids if slide_id not in slides_by_id],
+        "slides": [
+            _serialize_slide(slides_by_id[slide_id])
+            for slide_id in requested_ids
+            if slide_id in slides_by_id
+        ],
+        "missing_ids": [
+            str(slide_id)
+            for slide_id in requested_ids
+            if slide_id not in slides_by_id
+        ],
         "server_time": _iso_z(_utc_now()),
     }

@@ -1,0 +1,64 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Редактор слайдов</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/editor.css"
+    >
+</head>
+
+<body>
+    <div class="editor-layout">
+        <header class="editor-topbar">
+            <div class="topbar-zone"></div>
+            <div class="topbar-zone"></div>
+            <div class="topbar-zone"></div>
+        </header>
+
+        <aside class="editor-leftbar">
+            <div class="leftbar-tabs"></div>
+            <div class="leftbar-main"></div>
+            <div class="leftbar-footer"></div>
+        </aside>
+
+        <main class="editor-workspace">
+            <div class="editor-stage">
+                <div class="editor-canvas-shell">
+                    <section
+                        id="editor-canvas"
+                        class="editor-canvas"
+                    >
+                        <div class="editor-canvas-safe-zone"></div>
+                    </section>
+                </div>
+            </div>
+        </main>
+
+        <aside class="editor-rightbar">
+            <div class="rightbar-header"></div>
+            <div class="rightbar-main"></div>
+            <div class="rightbar-footer"></div>
+        </aside>
+
+        <footer class="editor-bottombar">
+            <div class="bottombar-zone"></div>
+            <div class="bottombar-zone"></div>
+            <div class="bottombar-zone"></div>
+        </footer>
+    </div>
+
+    <script
+        src="/static/js/editor.js"
+        defer
+    ></script>
+</body>
+</html>
