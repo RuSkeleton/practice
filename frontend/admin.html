@@ -151,6 +151,135 @@
         .btn-secondary:hover {
             background: #3a4a6e;
         }
+        .btn-inline {
+            width: auto;
+            padding: 11px 22px;
+            white-space: nowrap;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .section-header h2 {
+            margin-bottom: 6px;
+        }
+        .section-description {
+            max-width: 620px;
+            color: #7f93b3;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+        .slide-item {
+            align-items: flex-start;
+            gap: 18px;
+            padding: 16px;
+        }
+        .slide-header-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 7px;
+        }
+        .slide-title {
+            font-size: 16px;
+            font-weight: 650;
+            color: #f4f7ff;
+        }
+        .slide-meta {
+            color: #7f93b3;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+        .slide-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            max-width: 360px;
+        }
+        .edit-btn,
+        .display-btn {
+            padding: 7px 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .edit-btn {
+            color: #dcecff;
+            background: #24558d;
+            border: 1px solid #3577bd;
+        }
+        .edit-btn:hover {
+            background: #2d6caf;
+        }
+        .display-btn {
+            color: #f3e7c4;
+            background: #594a24;
+            border: 1px solid #8d7332;
+        }
+        .display-btn:hover {
+            background: #735f2c;
+        }
+        .status-badge,
+        .emergency-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-badge.showing {
+            color: #8df0af;
+            background: #173d2a;
+        }
+        .status-badge.scheduled {
+            color: #8fc7ff;
+            background: #183658;
+        }
+        .status-badge.paused {
+            color: #ffd28d;
+            background: #4d3618;
+        }
+        .status-badge.finished {
+            color: #aeb9ce;
+            background: #2c3445;
+        }
+        .emergency-badge {
+            color: #ffb2b2;
+            background: #4b1d28;
+        }
+        .modal-card.modal-wide {
+            width: min(620px, 100%);
+        }
+        .modal-subtitle {
+            margin: -8px 0 18px;
+            color: #7f93b3;
+            font-size: 14px;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 10px 12px;
+            border: 1px solid #2a3a5e;
+            border-radius: 8px;
+            background: #0f1a2e;
+        }
+        .checkbox-row input {
+            width: auto;
+        }
+        .field-hint {
+            margin-top: 5px;
+            color: #657896;
+            font-size: 12px;
+        }
         .form-message {
             margin-top: 12px;
             padding: 10px;
@@ -164,6 +293,9 @@
         .form-message.error {
             background: #3a1a1a;
             color: #ff6b6b;
+        }
+        .form-message:empty {
+            display: none;
         }
         .slide-item,
         .screen-item {
@@ -289,6 +421,21 @@
                 flex-wrap: wrap;
                 justify-content: center;
             }
+            .section-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .btn-inline {
+                width: 100%;
+            }
+            .slide-item {
+                flex-direction: column;
+            }
+            .slide-actions {
+                width: 100%;
+                max-width: none;
+                justify-content: flex-start;
+            }
         }
     </style>
 </head>
@@ -310,64 +457,17 @@
 
         <div id="tabSlides" class="tab-content active">
             <div class="card">
-                <h2>Создать слайд</h2>
-                <form id="slideForm">
-                    <div class="form-group">
-                        <label>Название слайда *</label>
-                        <input id="slideName" required placeholder="Введите название" />
+                <div class="section-header">
+                    <div>
+                        <h2>Слайды</h2>
+                        <p class="section-description">
+                            Здесь хранится каталог слайдов. Содержимое редактируется в отдельном редакторе,
+                            а сроки, частота и состояние показа меняются без удаления слайда.
+                        </p>
                     </div>
-                    <div class="form-group">
-                        <label>Тип (kind)</label>
-                        <select id="slideKind">
-                            <option value="announcement">Объявление</option>
-                            <option value="image">Изображение</option>
-                            <option value="greeting">Поздравление</option>
-                            <option value="metric">Показатель</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="contentGroup">
-                        <label>Содержание (текст или URL изображения)</label>
-                        <textarea id="slideContent" placeholder="Введите текст или URL"></textarea>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Дата начала *</label>
-                            <input id="startDate" type="datetime-local" required />
-                        </div>
-                        <div class="form-group">
-                            <label>Дата окончания *</label>
-                            <input id="endDate" type="datetime-local" required />
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Длительность (слотов)</label>
-                            <input id="durationSlots" type="number" value="1" min="1" max="4" />
-                        </div>
-                        <div class="form-group">
-                            <label>Режим частоты</label>
-                            <select id="frequencyMode">
-                                <option value="1">Обычный</option>
-                                <option value="2">Часто</option>
-                                <option value="3">Очень часто</option>
-                                <option value="4">Жёсткий интервал</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group" id="hardIntervalGroup" style="display:none;">
-                        <label>Интервал (>1)</label>
-                        <input id="hardInterval" type="number" value="5" min="2" />
-                    </div>
-                    <div class="form-group">
-                        <label><input id="isActive" type="checkbox" checked /> Активен</label>
-                    </div>
-                    <button type="submit" class="btn-primary">Опубликовать</button>
-                </form>
-                <div id="formMessage" class="form-message"></div>
-            </div>
-
-            <div class="card">
-                <h2>Все слайды</h2>
+                    <button type="button" id="createSlideBtn" class="btn-primary btn-inline">Создать слайд</button>
+                </div>
+                <div id="slidesMessage" class="form-message"></div>
                 <div id="slidesList"><p class="loading">Загрузка...</p></div>
             </div>
         </div>
@@ -448,6 +548,80 @@
                 <h2>Список пользователей</h2>
                 <div id="usersList"><p class="loading">Загрузка...</p></div>
             </div>
+        </div>
+    </div>
+
+    <div id="displaySettingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="displaySettingsTitle">
+        <div class="modal-card modal-wide">
+            <h2 id="displaySettingsTitle">Управление показом</h2>
+            <p id="displaySettingsSlideName" class="modal-subtitle"></p>
+            <form id="displaySettingsForm">
+                <input id="displaySlideId" type="hidden" />
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="displayStartDate">Дата начала</label>
+                        <input id="displayStartDate" type="datetime-local" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="displayEndDate">Дата окончания</label>
+                        <input id="displayEndDate" type="datetime-local" required />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="displayDurationSlots">Длительность показа</label>
+                        <select id="displayDurationSlots">
+                            <option value="1">1 слот</option>
+                            <option value="2">2 слота</option>
+                            <option value="3">3 слота</option>
+                            <option value="4">4 слота</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="displayFrequencyMode">Частота показа</label>
+                        <select id="displayFrequencyMode">
+                            <option value="1">Обычная</option>
+                            <option value="2">Повышенная</option>
+                            <option value="3">Высокая</option>
+                            <option value="4">Жёсткий интервал</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group hidden" id="displayHardIntervalGroup">
+                    <label for="displayHardInterval">Жёсткий интервал</label>
+                    <input id="displayHardInterval" type="number" min="2" step="1" value="5" />
+                    <div class="field-hint">Слайд будет закреплён за каждым указанным уникальным интервалом.</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="checkbox-row" for="displayIsActive">
+                            <input id="displayIsActive" type="checkbox" />
+                            <span>Разрешить показ слайда</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-row" for="displayIsEmergency">
+                            <input id="displayIsEmergency" type="checkbox" />
+                            <span>Экстренный слайд</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group hidden" id="displayAlarmTypeGroup">
+                    <label for="displayAlarmType">Тип тревоги</label>
+                    <input id="displayAlarmType" maxlength="50" placeholder="Например: fire" />
+                </div>
+
+                <div id="displaySettingsMessage" class="form-message"></div>
+                <div class="modal-actions">
+                    <button type="button" id="displaySettingsCancelBtn" class="btn-secondary">Отмена</button>
+                    <button type="submit" class="btn-primary">Сохранить</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -546,155 +720,288 @@
             return date.toISOString();
         }
 
-        // Показывать/скрывать поле интервала при смене режима частоты
-        document.getElementById('frequencyMode').addEventListener('change', function() {
-            const group = document.getElementById('hardIntervalGroup');
-            group.style.display = (this.value === '4') ? 'block' : 'none';
+        function parseServerDate(value) {
+            if (!value) return new Date(NaN);
+            const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : value + 'Z';
+            return new Date(normalized);
+        }
+
+        function utcIsoToLocalDateTimeValue(value) {
+            const date = parseServerDate(value);
+            if (Number.isNaN(date.getTime())) return '';
+            const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+            return localDate.toISOString().slice(0, 16);
+        }
+
+        async function apiFetch(path, options = {}) {
+            const headers = new Headers(options.headers || {});
+            headers.set('Authorization', 'Bearer ' + token);
+
+            const response = await fetch(API_BASE + path, {
+                ...options,
+                headers
+            });
+
+            if (response.status === 401) {
+                clearAuthAndRedirect();
+                throw new Error('Сессия истекла');
+            }
+
+            return response;
+        }
+
+        function showSlidesMessage(text, type = '') {
+            const message = document.getElementById('slidesMessage');
+            message.textContent = text;
+            message.className = 'form-message' + (type ? ' ' + type : '');
+        }
+
+        document.getElementById('createSlideBtn').addEventListener('click', function() {
+            window.location.href = 'editor.html';
         });
 
-        document.getElementById('slideForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const name = document.getElementById('slideName').value;
-            const kind = document.getElementById('slideKind').value;
-            const content = document.getElementById('slideContent').value;
-            const startDateLocal = document.getElementById('startDate').value;
-            const endDateLocal = document.getElementById('endDate').value;
-            const startDate = localDateTimeToUtcIso(startDateLocal);
-            const endDate = localDateTimeToUtcIso(endDateLocal);
+        function editSlide(id) {
+            window.location.href = 'editor.html?id=' + encodeURIComponent(id);
+        }
 
-            if (!startDate || !endDate) {
-                const msg = document.getElementById('formMessage');
-                msg.textContent = 'Ошибка: некорректные дата/время показа';
-                msg.className = 'form-message error';
-                return;
+        function getSlideStatus(slide) {
+            if (!slide.is_active) {
+                return { key: 'paused', label: 'Приостановлен', color: '#e6a84b' };
             }
 
-            if (new Date(startDate).getTime() >= new Date(endDate).getTime()) {
-                const msg = document.getElementById('formMessage');
-                msg.textContent = 'Ошибка: дата окончания должна быть позже даты начала';
-                msg.className = 'form-message error';
-                return;
-            }
-            const durationSlots = parseInt(document.getElementById('durationSlots').value) || 1;
-            const frequencyMode = parseInt(document.getElementById('frequencyMode').value);
-            const hardInterval = parseInt(document.getElementById('hardInterval').value) || null;
-            const isActive = document.getElementById('isActive').checked;
+            const now = Date.now();
+            const start = parseServerDate(slide.start_date).getTime();
+            const end = parseServerDate(slide.end_date).getTime();
 
-            // Формируем background и elements в зависимости от типа
-            const background = { type: "gradient", value: kind };
-            let elements = [];
-            if (kind === 'image') {
-                elements = [
-                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 80, width: 1600, height: 100, fontSize: 58, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "image", type: "image", role: "main_image", src: content, alt: name, layout: { x: 420, y: 220, width: 1080, height: 640, objectFit: "contain", zIndex: 2 } }
-                ];
-            } else if (kind === 'greeting') {
-                elements = [
-                    { id: "title", type: "text", role: "title", value: "Поздравляем!", layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 68, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "name", type: "text", role: "person_name", value: name, layout: { x: 220, y: 330, width: 1480, height: 120, fontSize: 56, fontWeight: 700, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: content || "День рождения!", layout: { x: 260, y: 520, width: 1400, height: 220, fontSize: 40, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
-                ];
-            } else if (kind === 'metric') {
-                elements = [
-                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "value", type: "text", role: "metric_value", value: content || "—", layout: { x: 260, y: 350, width: 1400, height: 220, fontSize: 96, fontWeight: 800, color: "#d6ffe8", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
-                ];
-            } else {
-                // announcement
-                elements = [
-                    { id: "title", type: "text", role: "title", value: name, layout: { x: 160, y: 120, width: 1600, height: 120, fontSize: 64, fontWeight: 800, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } },
-                    { id: "body", type: "text", role: "body", value: content || "", layout: { x: 220, y: 320, width: 1480, height: 420, fontSize: 42, color: "#ffffff", textAlign: "center", verticalAlign: "middle", zIndex: 2 } }
-                ];
+            if (Number.isNaN(start) || Number.isNaN(end)) {
+                return { key: 'paused', label: 'Некорректный период', color: '#e6a84b' };
             }
-
-            const slideData = {
-                name,
-                kind,
-                start_date: startDate,
-                end_date: endDate,
-                is_active: isActive,
-                duration_slots: durationSlots,
-                frequency_mode: frequencyMode,
-                hard_interval: (frequencyMode === 4) ? hardInterval : null,
-                is_emergency: false,
-                alarm_type: null,
-                background,
-                elements
-            };
-
-            try {
-                const response = await fetch(API_BASE + '/slides', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    },
-                    body: JSON.stringify(slideData)
-                });
-                const msg = document.getElementById('formMessage');
-                if (response.ok) {
-                    msg.textContent = 'Слайд создан!';
-                    msg.className = 'form-message success';
-                    document.getElementById('slideForm').reset();
-                    document.getElementById('isActive').checked = true;
-                    loadSlides();
-                } else {
-                    const err = await response.json();
-                    msg.textContent = 'Ошибка: ' + (err.detail || 'Неизвестная ошибка');
-                    msg.className = 'form-message error';
-                }
-            } catch {
-                document.getElementById('formMessage').textContent = 'Ошибка подключения к серверу';
-                document.getElementById('formMessage').className = 'form-message error';
+            if (now < start) {
+                return { key: 'scheduled', label: 'Запланирован', color: '#4a9eff' };
             }
-        });
+            if (now >= end) {
+                return { key: 'finished', label: 'Завершён', color: '#6a7a9a' };
+            }
+            return { key: 'showing', label: 'Показывается', color: '#27ae60' };
+        }
+
+        function formatSlidePeriod(slide) {
+            const start = parseServerDate(slide.start_date);
+            const end = parseServerDate(slide.end_date);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Период не задан';
+            return start.toLocaleString() + ' → ' + end.toLocaleString();
+        }
 
         async function loadSlides() {
+            const container = document.getElementById('slidesList');
             try {
-                const response = await fetch(API_BASE + '/slides', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                if (response.ok) {
-                    const slides = await response.json();
-                    renderSlides(slides);
+                const response = await apiFetch('/slides');
+                if (!response.ok) {
+                    throw new Error('Не удалось загрузить слайды');
                 }
-            } catch {}
+                const slides = await response.json();
+                renderSlides(slides);
+                showSlidesMessage('');
+            } catch (error) {
+                if (error.message === 'Сессия истекла') return;
+                container.innerHTML = '<div class="empty-state">Не удалось загрузить слайды</div>';
+                showSlidesMessage(error.message || 'Ошибка загрузки', 'error');
+            }
         }
 
         function renderSlides(slides) {
             const container = document.getElementById('slidesList');
             if (!slides || !slides.length) {
-                container.innerHTML = '<div class="empty-state">Нет слайдов</div>';
+                container.innerHTML = '<div class="empty-state">Слайдов пока нет. Создай первый слайд в редакторе.</div>';
                 return;
             }
-            const kindMap = { announcement: 'Объявление', image: 'Изображение', greeting: 'Поздравление', metric: 'Показатель' };
-            container.innerHTML = slides.map(s => {
-                const active = s.is_active && new Date(s.start_date) <= new Date() && new Date(s.end_date) >= new Date();
-                const safeName = escapeHtml(s.name || '(без названия)');
-                const safeKind = escapeHtml(kindMap[s.kind] || s.kind || '');
-                const interval = s.frequency_mode === 4 ? ' (интервал ' + Number(s.hard_interval) + ')' : '';
-                return '<div class="slide-item" style="border-left-color: ' + (active ? '#27ae60' : '#6a7a9a') + '">' +
+
+            const kindMap = {
+                announcement: 'Объявление',
+                image: 'Изображение',
+                greeting: 'Поздравление',
+                metric: 'Показатель'
+            };
+            const frequencyMap = {
+                1: 'обычная частота',
+                2: 'повышенная частота',
+                3: 'высокая частота',
+                4: 'жёсткий интервал'
+            };
+
+            container.innerHTML = slides.map(function(slide) {
+                const status = getSlideStatus(slide);
+                const safeName = escapeHtml(slide.name || '(без названия)');
+                const safeKind = escapeHtml(kindMap[slide.kind] || slide.kind || 'Без типа');
+                const frequency = frequencyMap[slide.frequency_mode] || 'частота не задана';
+                const interval = slide.frequency_mode === 4 && slide.hard_interval
+                    ? ', каждый ' + Number(slide.hard_interval) + '-й интервал'
+                    : '';
+                const emergencyBadge = slide.is_emergency
+                    ? '<span class="emergency-badge">Экстренный' + (slide.alarm_type ? ': ' + escapeHtml(slide.alarm_type) : '') + '</span>'
+                    : '';
+
+                return '<div class="slide-item" style="border-left-color:' + status.color + '">' +
                     '<div class="slide-info">' +
-                    '<div>' + safeName + '</div>' +
-                    '<div style="font-size:12px;color:#6a7a9a;">' +
-                    safeKind +
-                    (active ? ' Активен' : ' Неактивен') +
-                    interval +
-                    ' ' + new Date(s.start_date).toLocaleDateString() + ' → ' + new Date(s.end_date).toLocaleDateString() +
-                    '</div></div>' +
-                    '<button class="delete-btn" onclick="deleteSlide(' + Number(s.id) + ')">Удалить</button></div>';
+                        '<div class="slide-header-row">' +
+                            '<span class="slide-title">' + safeName + '</span>' +
+                            '<span class="status-badge ' + status.key + '">' + status.label + '</span>' +
+                            emergencyBadge +
+                        '</div>' +
+                        '<div class="slide-meta">' + safeKind + ' • ' + escapeHtml(frequency) + interval + ' • ' + Number(slide.duration_slots || 1) + ' слот(а)</div>' +
+                        '<div class="slide-meta">' + escapeHtml(formatSlidePeriod(slide)) + ' • Ревизия ' + Number(slide.revision || 1) + '</div>' +
+                    '</div>' +
+                    '<div class="slide-actions">' +
+                        '<button type="button" class="edit-btn" onclick="editSlide(' + Number(slide.id) + ')">Редактировать</button>' +
+                        '<button type="button" class="display-btn" onclick="openDisplaySettings(' + Number(slide.id) + ')">Параметры показа</button>' +
+                        '<button type="button" class="delete-btn" onclick="deleteSlide(' + Number(slide.id) + ')">Удалить</button>' +
+                    '</div>' +
+                '</div>';
             }).join('');
         }
 
-        async function deleteSlide(id) {
-            if (!confirm('Удалить этот слайд?')) return;
+        const displaySettingsModal = document.getElementById('displaySettingsModal');
+        const displaySettingsForm = document.getElementById('displaySettingsForm');
+        const displayFrequencyMode = document.getElementById('displayFrequencyMode');
+        const displayIsEmergency = document.getElementById('displayIsEmergency');
+
+        function updateDisplaySettingsVisibility() {
+            document.getElementById('displayHardIntervalGroup').classList.toggle(
+                'hidden',
+                displayFrequencyMode.value !== '4'
+            );
+            document.getElementById('displayAlarmTypeGroup').classList.toggle(
+                'hidden',
+                !displayIsEmergency.checked
+            );
+        }
+
+        displayFrequencyMode.addEventListener('change', updateDisplaySettingsVisibility);
+        displayIsEmergency.addEventListener('change', updateDisplaySettingsVisibility);
+
+        async function openDisplaySettings(id) {
+            const message = document.getElementById('displaySettingsMessage');
+            message.textContent = '';
+            message.className = 'form-message';
+
             try {
-                await fetch(API_BASE + '/slides/' + id, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + token }
+                const response = await apiFetch('/slides/' + id);
+                if (!response.ok) {
+                    const error = await response.json().catch(function() { return {}; });
+                    throw new Error(error.detail || 'Не удалось загрузить слайд');
+                }
+
+                const slide = await response.json();
+                document.getElementById('displaySlideId').value = slide.id;
+                document.getElementById('displaySettingsSlideName').textContent = slide.name || 'Без названия';
+                document.getElementById('displayStartDate').value = utcIsoToLocalDateTimeValue(slide.start_date);
+                document.getElementById('displayEndDate').value = utcIsoToLocalDateTimeValue(slide.end_date);
+                document.getElementById('displayDurationSlots').value = String(slide.duration_slots || 1);
+                displayFrequencyMode.value = String(slide.frequency_mode || 1);
+                document.getElementById('displayHardInterval').value = slide.hard_interval || 5;
+                document.getElementById('displayIsActive').checked = Boolean(slide.is_active);
+                displayIsEmergency.checked = Boolean(slide.is_emergency);
+                document.getElementById('displayAlarmType').value = slide.alarm_type || '';
+                updateDisplaySettingsVisibility();
+                displaySettingsModal.classList.remove('hidden');
+            } catch (error) {
+                if (error.message === 'Сессия истекла') return;
+                showSlidesMessage(error.message || 'Не удалось открыть параметры показа', 'error');
+            }
+        }
+
+        function closeDisplaySettings() {
+            displaySettingsModal.classList.add('hidden');
+            displaySettingsForm.reset();
+        }
+
+        document.getElementById('displaySettingsCancelBtn').addEventListener('click', closeDisplaySettings);
+        displaySettingsModal.addEventListener('click', function(event) {
+            if (event.target === displaySettingsModal) closeDisplaySettings();
+        });
+
+        displaySettingsForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const id = Number(document.getElementById('displaySlideId').value);
+            const startDate = localDateTimeToUtcIso(document.getElementById('displayStartDate').value);
+            const endDate = localDateTimeToUtcIso(document.getElementById('displayEndDate').value);
+            const frequencyMode = Number(displayFrequencyMode.value);
+            const hardInterval = Number(document.getElementById('displayHardInterval').value);
+            const isEmergency = displayIsEmergency.checked;
+            const alarmType = document.getElementById('displayAlarmType').value.trim();
+            const message = document.getElementById('displaySettingsMessage');
+
+            if (!id || !startDate || !endDate) {
+                message.textContent = 'Укажи корректные даты показа';
+                message.className = 'form-message error';
+                return;
+            }
+            if (new Date(startDate).getTime() >= new Date(endDate).getTime()) {
+                message.textContent = 'Дата окончания должна быть позже даты начала';
+                message.className = 'form-message error';
+                return;
+            }
+            if (frequencyMode === 4 && (!Number.isInteger(hardInterval) || hardInterval < 2)) {
+                message.textContent = 'Для жёсткого режима нужен интервал не меньше 2';
+                message.className = 'form-message error';
+                return;
+            }
+            if (isEmergency && !alarmType) {
+                message.textContent = 'Для экстренного слайда укажи тип тревоги';
+                message.className = 'form-message error';
+                return;
+            }
+
+            const updateData = {
+                start_date: startDate,
+                end_date: endDate,
+                is_active: document.getElementById('displayIsActive').checked,
+                duration_slots: Number(document.getElementById('displayDurationSlots').value),
+                frequency_mode: frequencyMode,
+                hard_interval: frequencyMode === 4 ? hardInterval : null,
+                is_emergency: isEmergency,
+                alarm_type: isEmergency ? alarmType : null
+            };
+
+            try {
+                const response = await apiFetch('/slides/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updateData)
                 });
-                loadSlides();
-            } catch {}
+
+                if (!response.ok) {
+                    const error = await response.json().catch(function() { return {}; });
+                    throw new Error(error.detail || 'Не удалось сохранить параметры');
+                }
+
+                message.textContent = 'Параметры показа сохранены';
+                message.className = 'form-message success';
+                await loadSlides();
+                window.setTimeout(closeDisplaySettings, 450);
+            } catch (error) {
+                if (error.message === 'Сессия истекла') return;
+                message.textContent = 'Ошибка: ' + (error.message || 'не удалось сохранить параметры');
+                message.className = 'form-message error';
+            }
+        });
+
+        async function deleteSlide(id) {
+            if (!confirm('Удалить этот слайд без возможности восстановления?')) return;
+
+            try {
+                const response = await apiFetch('/slides/' + id, { method: 'DELETE' });
+                if (!response.ok) {
+                    const error = await response.json().catch(function() { return {}; });
+                    throw new Error(error.detail || 'Не удалось удалить слайд');
+                }
+                showSlidesMessage('Слайд удалён', 'success');
+                await loadSlides();
+            } catch (error) {
+                if (error.message === 'Сессия истекла') return;
+                showSlidesMessage(error.message || 'Ошибка удаления', 'error');
+            }
         }
 
         const generateBtn = document.getElementById('generateCodeBtn');
@@ -1152,8 +1459,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadUserProfile();
         });
-
-        setInterval(loadSlides, 5000);
     </script>
+    <script src="/static/js/admin_live_updates.js"></script>
 </body>
 </html>

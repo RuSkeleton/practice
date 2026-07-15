@@ -1,64 +1,1963 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор слайда</title>
+    <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=PKUD5Xy7_cw2XbfEgkcHRRduFTit4zpd5Yi9m0WdGJraOsiGI2vB4QqjQB-0a59kXSLid5M1FwsHzRm4lJvN5Bsu_UHluhMoXImX2f2HCvzRKIvcMKaJg2X61c8uVisQlzq-Bo7TC-bqsBfD6zsGsURSNGYT5HcZJAsdgIr-Rn90OEDA_U4FgtP_2J-a9X-XhWtqlQhW56ExLKHhFbR5EeE56c05RtlJQKbjPw5KVl-X7hA54RNf5nsb4PiUsMBX0VjtzbiOPioDp5a2pw0UraKxdlRUf00VNyjgzP-2e8PC9TqHPpD49VBAokFw5wzE" charset="UTF-8"></script><style>
+        :root {
+            --panel: #ffffff;
+            --border: #d9dee8;
+            --muted: #687386;
+            --accent: #315efb;
+            --danger: #c73535;
+            --workspace: #e9edf3;
+        }
 
-    <title>Редактор слайдов</title>
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            color: #182033;
+            background: var(--workspace);
+            overflow: hidden;
+        }
 
-    <link
-        rel="stylesheet"
-        href="/static/css/editor.css"
-    >
+        button, input, select, textarea { font: inherit; }
+        button { cursor: pointer; }
+
+        .editor {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr) 300px;
+            grid-template-rows: 64px minmax(0, 1fr);
+            height: 100vh;
+        }
+
+        .topbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .topbar h1 {
+            margin: 0;
+            font-size: 18px;
+            white-space: nowrap;
+            max-width: 460px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topbar .spacer { flex: 1; }
+        .status { color: var(--muted); font-size: 13px; }
+
+        .btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 8px;
+            padding: 9px 12px;
+        }
+
+        .btn:hover { background: #f6f8fc; }
+        .btn:disabled { cursor: default; opacity: .6; }
+        .btn-primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+        .btn-primary:hover { background: #244bd8; }
+        .btn-danger { color: var(--danger); }
+
+        .sidebar {
+            background: var(--panel);
+            overflow: auto;
+            padding: 14px;
+        }
+
+        .sidebar-left { border-right: 1px solid var(--border); }
+        .sidebar-right { border-left: 1px solid var(--border); }
+
+        .section { margin-bottom: 20px; }
+        .section h2 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: var(--muted);
+        }
+
+        .stack { display: grid; gap: 8px; }
+        .tool-button { width: 100%; text-align: left; }
+
+        .workspace {
+            min-width: 0;
+            min-height: 0;
+            display: grid;
+            place-items: center;
+            overflow: auto;
+            padding: 28px;
+        }
+
+        .canvas-shell {
+            position: relative;
+            width: min(100%, calc((100vh - 120px) * 16 / 9));
+            aspect-ratio: 16 / 9;
+            background: #111827;
+            box-shadow: 0 14px 40px rgba(20, 31, 55, .22);
+        }
+
+        .canvas-host {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            background: #111827;
+        }
+
+        /* Эти классы совпадают с index.html: редактор использует тот же DOM-рендерер. */
+        .slide-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: top left;
+            background: linear-gradient(135deg, #07111f, #111c33);
+        }
+
+        .bg-default { background: linear-gradient(135deg, #07111f, #111c33); }
+        .bg-announcement { background: linear-gradient(135deg, #173a71, #071b35 75%); }
+        .bg-urgent { background: linear-gradient(135deg, #852121, #2a0710 75%); }
+        .bg-image { background: linear-gradient(135deg, #111827, #020617 75%); }
+        .bg-greeting { background: radial-gradient(circle at 50% 15%, rgba(255,255,255,0.20), transparent 28%), linear-gradient(135deg, #b83a7d, #6e2fc9); }
+        .bg-metric { background: linear-gradient(135deg, #05110c, #0d2a1d 75%); }
+        .bg-light { background: linear-gradient(135deg, #f8fafc, #dbeafe); color: #0f172a; }
+
+        .slide-element {
+            position: absolute;
+            overflow: hidden;
+            color: inherit;
+        }
+        .slide-element.role-muted { opacity: .78; }
+        .slide-text {
+            display: flex;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.15;
+        }
+        .slide-text.align-left { text-align: left; justify-content: flex-start; }
+        .slide-text.align-center { text-align: center; justify-content: center; }
+        .slide-text.align-right { text-align: right; justify-content: flex-end; }
+        .slide-text.valign-top { align-items: flex-start; }
+        .slide-text.valign-middle { align-items: center; }
+        .slide-text.valign-bottom { align-items: flex-end; }
+        .slide-image-element img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+        .slide-image-element.fit-cover img { object-fit: cover; }
+        .slide-image-element.fit-fill img { object-fit: fill; }
+        .slide-image-element.shape-rounded img { border-radius: 28px; }
+        .slide-image-element.shape-circle img { border-radius: 50%; }
+        .slide-image-element.shadow-soft img { box-shadow: 0 24px 70px rgba(0,0,0,.45); }
+        .slide-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 24px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.14);
+            border: 1px solid rgba(255,255,255,.20);
+            backdrop-filter: blur(10px);
+            font-weight: 700;
+            letter-spacing: .02em;
+            white-space: nowrap;
+        }
+        .slide-chart {
+            background: rgba(0,0,0,.18);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 28px;
+            padding: 28px;
+        }
+        .slide-chart canvas { width: 100%; height: 100%; display: block; }
+        .metric-value {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Consolas, "Courier New", monospace;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        /* Редакторская обвязка поверх узлов общего рендера. */
+        .canvas-element {
+            user-select: none;
+            touch-action: none;
+            cursor: grab;
+        }
+        .canvas-element:active { cursor: grabbing; }
+        .canvas-host.preview-mode .canvas-element { cursor: default; }
+        .canvas-element img,
+        .canvas-element canvas { pointer-events: none; }
+        .canvas-element.selected {
+            outline: 5px solid #315efb;
+            outline-offset: 2px;
+            overflow: visible;
+        }
+        .slide-image-element.no-image::before {
+            content: "Выбери изображение";
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            color: rgba(255,255,255,.8);
+            background: rgba(255,255,255,.1);
+            border: 3px dashed rgba(255,255,255,.45);
+            font-size: 36px;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 4px solid #ffffff;
+            border-radius: 5px;
+            background: var(--accent);
+            box-shadow: 0 2px 7px rgba(0, 0, 0, .28);
+            z-index: 10000;
+            touch-action: none;
+        }
+
+        .resize-handle[data-direction="n"]  { left: 50%; top: 0; transform: translate(-50%, -50%); cursor: ns-resize; }
+        .resize-handle[data-direction="s"]  { left: 50%; bottom: 0; transform: translate(-50%, 50%); cursor: ns-resize; }
+        .resize-handle[data-direction="e"]  { right: 0; top: 50%; transform: translate(50%, -50%); cursor: ew-resize; }
+        .resize-handle[data-direction="w"]  { left: 0; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+        .resize-handle[data-direction="ne"] { right: 0; top: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+        .resize-handle[data-direction="nw"] { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+        .resize-handle[data-direction="se"] { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
+        .resize-handle[data-direction="sw"] { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+
+        .chart-source-block {
+            display: grid;
+            gap: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: #f8fafc;
+        }
+
+        .chart-source-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        .field { display: grid; gap: 5px; margin-bottom: 10px; }
+        .field label { font-size: 12px; color: var(--muted); }
+        .field input, .field select, .field textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 8px;
+            background: #fff;
+        }
+        .field textarea { min-height: 80px; resize: vertical; }
+        .field input[type="color"] { height: 42px; padding: 3px; cursor: pointer; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 4px 0 12px;
+        }
+        .checkbox-row label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .checkbox-row input { width: auto; }
+
+        .file-row { display: grid; gap: 7px; }
+        .file-info {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .empty-note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 20000;
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, .62);
+        }
+
+        .modal {
+            width: min(620px, 100%);
+            max-height: calc(100vh - 40px);
+            overflow: auto;
+            border-radius: 14px;
+            background: #ffffff;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .35);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h2 { margin: 0; font-size: 19px; }
+        .modal-body { padding: 20px; }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .form-message {
+            min-height: 20px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .form-message.error { color: var(--danger); }
+        .form-message.success { color: #15803d; }
+        .field-hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
+        .modal-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 42px;
+            font-size: 13px;
+        }
+        .modal-checkbox input { width: auto; }
+
+        .hidden { display: none !important; }
+    </style>
 </head>
-
 <body>
-    <div class="editor-layout">
-        <header class="editor-topbar">
-            <div class="topbar-zone"></div>
-            <div class="topbar-zone"></div>
-            <div class="topbar-zone"></div>
-        </header>
+<div class="editor">
+    <header class="topbar">
+        <button class="btn" id="backButton" type="button">← К слайдам</button>
+        <h1 id="pageTitle">Новый слайд</h1>
+        <span class="status" id="statusText">Готово</span>
+        <div class="spacer"></div>
+        <button class="btn" id="previewButton" type="button">Предпросмотр</button>
+        <button class="btn" id="displaySettingsButton" type="button">Параметры показа</button>
+        <button class="btn btn-primary" id="saveButton" type="button">Сохранить</button>
+    </header>
 
-        <aside class="editor-leftbar">
-            <div class="leftbar-tabs"></div>
-            <div class="leftbar-main"></div>
-            <div class="leftbar-footer"></div>
-        </aside>
+    <aside class="sidebar sidebar-left">
+        <section class="section">
+            <h2>Элементы</h2>
+            <div class="stack">
+                <button class="btn tool-button" data-add="text" type="button">+ Текст</button>
+                <button class="btn tool-button" data-add="image" type="button">+ Изображение</button>
+                <button class="btn tool-button" data-add="badge" type="button">+ Бейдж</button>
+                <button class="btn tool-button" data-add="chart" type="button">+ График</button>
+            </div>
+        </section>
 
-        <main class="editor-workspace">
-            <div class="editor-stage">
-                <div class="editor-canvas-shell">
-                    <section
-                        id="editor-canvas"
-                        class="editor-canvas"
-                    >
-                        <div class="editor-canvas-safe-zone"></div>
-                    </section>
+        <section class="section">
+            <h2>Слайд</h2>
+            <div class="field">
+                <label for="slideName">Название</label>
+                <input id="slideName" maxlength="200" value="Новый слайд">
+            </div>
+            <div class="field">
+                <label for="slideKind">Тип</label>
+                <select id="slideKind">
+                    <option value="announcement">Объявление</option>
+                    <option value="image">Изображение</option>
+                    <option value="congratulation">Поздравление</option>
+                    <option value="metric">Показатель</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="backgroundType">Фон</label>
+                <select id="backgroundType">
+                    <option value="color">Цвет</option>
+                    <option value="gradient">Градиент</option>
+                    <option value="image">Изображение</option>
+                </select>
+            </div>
+
+            <div id="backgroundColorControls" class="field">
+                <label for="backgroundColor">Цвет фона</label>
+                <input id="backgroundColor" type="color" value="#07111f">
+            </div>
+
+            <div id="backgroundGradientControls" class="field hidden">
+                <label for="backgroundGradient">Пресет градиента</label>
+                <select id="backgroundGradient">
+                    <option value="default">Тёмный</option>
+                    <option value="announcement">Объявление</option>
+                    <option value="urgent">Срочный</option>
+                    <option value="greeting">Поздравление</option>
+                    <option value="metric">Показатель</option>
+                    <option value="light">Светлый</option>
+                </select>
+            </div>
+
+            <div id="backgroundImageControls" class="field hidden">
+                <label>Изображение фона</label>
+                <div class="file-row">
+                    <button class="btn" id="chooseBackgroundImageButton" type="button">Выбрать изображение</button>
+                    <button class="btn btn-danger" id="clearBackgroundImageButton" type="button">Убрать изображение</button>
+                    <span class="file-info" id="backgroundImageInfo">Файл не выбран</span>
+                </div>
+                <input id="backgroundImageInput" class="hidden" type="file"
+                       accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif">
+            </div>
+        </section>
+    </aside>
+
+    <main class="workspace" id="workspace">
+        <div class="canvas-shell" id="canvasShell">
+            <div class="canvas-host" id="canvas" aria-label="Холст слайда 1920 на 1080"></div>
+        </div>
+    </main>
+
+    <aside class="sidebar sidebar-right">
+        <section class="section">
+            <h2>Свойства элемента</h2>
+            <p class="empty-note" id="noSelection">Выбери элемент на холсте. Элементы можно перемещать мышью.</p>
+
+            <div id="properties" class="hidden">
+                <div class="grid-2">
+                    <div class="field"><label for="elementX">X</label><input id="elementX" type="number"></div>
+                    <div class="field"><label for="elementY">Y</label><input id="elementY" type="number"></div>
+                    <div class="field"><label for="elementWidth">Ширина</label><input id="elementWidth" type="number" min="1"></div>
+                    <div class="field"><label for="elementHeight">Высота</label><input id="elementHeight" type="number" min="1"></div>
+                </div>
+
+                <div id="textProperties" class="hidden">
+                    <div class="field">
+                        <label for="elementValue">Текст</label>
+                        <textarea id="elementValue"></textarea>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label for="elementFontSize">Размер шрифта</label><input id="elementFontSize" type="number" min="1"></div>
+                        <div class="field"><label for="elementColor">Цвет текста</label><input id="elementColor" type="color"></div>
+                    </div>
+
+                    <div class="field">
+                        <label for="elementAlign">Выравнивание</label>
+                        <select id="elementAlign">
+                            <option value="left">Слева</option>
+                            <option value="center">По центру</option>
+                            <option value="right">Справа</option>
+                        </select>
+                    </div>
+
+                    <div class="checkbox-row">
+                        <label><input id="elementBold" type="checkbox"> <strong>Жирный</strong></label>
+                        <label><input id="elementItalic" type="checkbox"> <em>Курсив</em></label>
+                    </div>
+                </div>
+
+                <div id="imageProperties" class="hidden">
+                    <div class="field">
+                        <label>Файл изображения</label>
+                        <div class="file-row">
+                            <button class="btn" id="chooseElementImageButton" type="button">Выбрать изображение</button>
+                            <span class="file-info" id="elementImageInfo">Файл не выбран</span>
+                        </div>
+                        <input id="elementImageInput" class="hidden" type="file"
+                               accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif">
+                    </div>
+                    <div class="field">
+                        <label for="elementImageFit">Вписывание</label>
+                        <select id="elementImageFit">
+                            <option value="cover">Заполнить с обрезкой</option>
+                            <option value="contain">Вместить целиком</option>
+                            <option value="fill">Растянуть</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="chartProperties" class="hidden">
+                    <div class="field">
+                        <label for="chartType">Тип графика</label>
+                        <select id="chartType">
+                            <option value="bar">Столбчатый</option>
+                            <option value="line">Линейный</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Источник данных CSV / JSON</label>
+                        <div class="file-row">
+                            <button class="btn" id="chooseChartDataButton" type="button">Выбрать файл данных</button>
+                            <span class="file-info" id="chartDataFileInfo">Файл не выбран. Текущие данные графика останутся как снимок.</span>
+                        </div>
+                        <input id="chartDataInput" class="hidden" type="file"
+                               accept=".csv,.json,text/csv,application/csv,application/json">
+                    </div>
+
+                    <div class="chart-source-block hidden" id="chartSourceControls">
+                        <div class="chart-source-title" id="chartSourceTitle">Источник</div>
+
+                        <div id="chartCsvControls" class="hidden">
+                            <div class="field">
+                                <label for="chartCsvMode">Представление</label>
+                                <select id="chartCsvMode">
+                                    <option value="object_by_categories">Один объект по дням / категориям</option>
+                                    <option value="objects_by_category">Все объекты за один день / категорию</option>
+                                </select>
+                            </div>
+
+                            <div class="field" id="chartCsvObjectGroup">
+                                <label for="chartCsvObject">Объект / сотрудник</label>
+                                <select id="chartCsvObject"></select>
+                            </div>
+
+                            <div class="grid-2" id="chartCsvRangeGroup">
+                                <div class="field">
+                                    <label for="chartCsvRangeStart">Начало диапазона</label>
+                                    <select id="chartCsvRangeStart"></select>
+                                </div>
+                                <div class="field">
+                                    <label for="chartCsvRangeEnd">Конец диапазона</label>
+                                    <select id="chartCsvRangeEnd"></select>
+                                </div>
+                            </div>
+
+                            <div class="field hidden" id="chartCsvCategoryGroup">
+                                <label for="chartCsvCategory">День / категория</label>
+                                <select id="chartCsvCategory"></select>
+                            </div>
+                        </div>
+
+                        <div id="chartJsonControls" class="hidden">
+                            <div class="field">
+                                <label for="chartJsonMetric">Показатель</label>
+                                <select id="chartJsonMetric"></select>
+                            </div>
+                            <div class="grid-2">
+                                <div class="field">
+                                    <label for="chartJsonDateFrom">Дата от</label>
+                                    <input id="chartJsonDateFrom" type="date">
+                                </div>
+                                <div class="field">
+                                    <label for="chartJsonDateTo">Дата до</label>
+                                    <input id="chartJsonDateTo" type="date">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="applyChartDataButton" type="button">Построить график</button>
+                    </div>
+
+                    <div class="form-message" id="chartDataMessage"></div>
+                    <p class="field-hint">Файл читается только в текущей вкладке и не загружается на сервер. В слайд сохраняются уже выбранные подписи и числа.</p>
+                </div>
+
+                <div class="stack">
+                    <button class="btn" id="duplicateButton" type="button">Дублировать</button>
+                    <button class="btn btn-danger" id="deleteButton" type="button">Удалить элемент</button>
                 </div>
             </div>
-        </main>
+        </section>
+    </aside>
+</div>
 
-        <aside class="editor-rightbar">
-            <div class="rightbar-header"></div>
-            <div class="rightbar-main"></div>
-            <div class="rightbar-footer"></div>
-        </aside>
+<div class="modal-backdrop hidden" id="displaySettingsModal" role="dialog" aria-modal="true" aria-labelledby="displaySettingsTitle">
+    <section class="modal">
+        <header class="modal-header">
+            <div>
+                <h2 id="displaySettingsTitle">Параметры показа</h2>
+                <div class="status" id="displaySettingsSlideName"></div>
+            </div>
+            <button class="btn" id="displaySettingsCloseButton" type="button" aria-label="Закрыть">✕</button>
+        </header>
 
-        <footer class="editor-bottombar">
-            <div class="bottombar-zone"></div>
-            <div class="bottombar-zone"></div>
-            <div class="bottombar-zone"></div>
-        </footer>
-    </div>
+        <form class="modal-body" id="displaySettingsForm">
+            <div class="grid-2">
+                <div class="field">
+                    <label for="displayStartDate">Дата начала</label>
+                    <input id="displayStartDate" type="datetime-local" required>
+                </div>
+                <div class="field">
+                    <label for="displayEndDate">Дата окончания</label>
+                    <input id="displayEndDate" type="datetime-local" required>
+                </div>
+            </div>
 
-    <script
-        src="/static/js/editor.js"
-        defer
-    ></script>
+            <div class="grid-2">
+                <div class="field">
+                    <label for="displayDurationSlots">Длительность показа</label>
+                    <select id="displayDurationSlots">
+                        <option value="1">1 слот</option>
+                        <option value="2">2 слота</option>
+                        <option value="3">3 слота</option>
+                        <option value="4">4 слота</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="displayFrequencyMode">Частота показа</label>
+                    <select id="displayFrequencyMode">
+                        <option value="1">Обычная</option>
+                        <option value="2">Повышенная</option>
+                        <option value="3">Высокая</option>
+                        <option value="4">Жёсткий интервал</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="field hidden" id="displayHardIntervalGroup">
+                <label for="displayHardInterval">Жёсткий интервал</label>
+                <input id="displayHardInterval" type="number" min="2" step="1" value="5">
+                <div class="field-hint">Используется только для режима «Жёсткий интервал».</div>
+            </div>
+
+            <div class="grid-2">
+                <label class="modal-checkbox" for="displayIsActive">
+                    <input id="displayIsActive" type="checkbox">
+                    <span>Разрешить показ слайда</span>
+                </label>
+                <label class="modal-checkbox" for="displayIsEmergency">
+                    <input id="displayIsEmergency" type="checkbox">
+                    <span>Экстренный слайд</span>
+                </label>
+            </div>
+
+            <div class="field hidden" id="displayAlarmTypeGroup">
+                <label for="displayAlarmType">Тип тревоги</label>
+                <input id="displayAlarmType" maxlength="50" placeholder="Например: fire">
+            </div>
+
+            <div class="field-hint">Изменения применяются к открытому слайду локально. На сервер они попадут только после нажатия основной кнопки «Сохранить».</div>
+            <div class="form-message" id="displaySettingsMessage"></div>
+
+            <div class="modal-actions">
+                <button class="btn" id="displaySettingsCancelButton" type="button">Отмена</button>
+                <button class="btn btn-primary" type="submit">Применить</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<script src="utils.js"></script>
+<script src="slide_rendering.js"></script>
+<script>
+(() => {
+    'use strict';
+
+    const API_BASE = '/api';
+    const TOKEN_KEY = 'access_token';
+    const CANVAS_WIDTH = 1920;
+    const CANVAS_HEIGHT = 1080;
+    const IMAGE_ACCEPTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    const DATA_ACCEPTED_EXTENSIONS = ['csv', 'json'];
+    const slideId = new URLSearchParams(location.search).get('id');
+
+    const state = {
+        slide: createEmptySlide(),
+        selectedElementId: null,
+        preview: false,
+        pendingImages: new Map(),
+        chartSources: new Map()
+    };
+
+    const refs = {
+        editor: document.querySelector('.editor'),
+        leftSidebar: document.querySelector('.sidebar-left'),
+        rightSidebar: document.querySelector('.sidebar-right'),
+        canvas: document.getElementById('canvas'),
+        canvasShell: document.getElementById('canvasShell'),
+        pageTitle: document.getElementById('pageTitle'),
+        statusText: document.getElementById('statusText'),
+        saveButton: document.getElementById('saveButton'),
+        previewButton: document.getElementById('previewButton'),
+        displaySettingsButton: document.getElementById('displaySettingsButton'),
+        displaySettingsModal: document.getElementById('displaySettingsModal'),
+        displaySettingsForm: document.getElementById('displaySettingsForm'),
+        displaySettingsMessage: document.getElementById('displaySettingsMessage'),
+        displayStartDate: document.getElementById('displayStartDate'),
+        displayEndDate: document.getElementById('displayEndDate'),
+        displayDurationSlots: document.getElementById('displayDurationSlots'),
+        displayFrequencyMode: document.getElementById('displayFrequencyMode'),
+        displayHardIntervalGroup: document.getElementById('displayHardIntervalGroup'),
+        displayHardInterval: document.getElementById('displayHardInterval'),
+        displayIsActive: document.getElementById('displayIsActive'),
+        displayIsEmergency: document.getElementById('displayIsEmergency'),
+        displayAlarmTypeGroup: document.getElementById('displayAlarmTypeGroup'),
+        displayAlarmType: document.getElementById('displayAlarmType'),
+        slideName: document.getElementById('slideName'),
+        slideKind: document.getElementById('slideKind'),
+        backgroundType: document.getElementById('backgroundType'),
+        backgroundColorControls: document.getElementById('backgroundColorControls'),
+        backgroundGradientControls: document.getElementById('backgroundGradientControls'),
+        backgroundImageControls: document.getElementById('backgroundImageControls'),
+        backgroundColor: document.getElementById('backgroundColor'),
+        backgroundGradient: document.getElementById('backgroundGradient'),
+        backgroundImageInput: document.getElementById('backgroundImageInput'),
+        backgroundImageInfo: document.getElementById('backgroundImageInfo'),
+        noSelection: document.getElementById('noSelection'),
+        properties: document.getElementById('properties'),
+        textProperties: document.getElementById('textProperties'),
+        imageProperties: document.getElementById('imageProperties'),
+        chartProperties: document.getElementById('chartProperties'),
+        elementValue: document.getElementById('elementValue'),
+        elementX: document.getElementById('elementX'),
+        elementY: document.getElementById('elementY'),
+        elementWidth: document.getElementById('elementWidth'),
+        elementHeight: document.getElementById('elementHeight'),
+        elementFontSize: document.getElementById('elementFontSize'),
+        elementColor: document.getElementById('elementColor'),
+        elementAlign: document.getElementById('elementAlign'),
+        elementBold: document.getElementById('elementBold'),
+        elementItalic: document.getElementById('elementItalic'),
+        elementImageInput: document.getElementById('elementImageInput'),
+        elementImageInfo: document.getElementById('elementImageInfo'),
+        elementImageFit: document.getElementById('elementImageFit'),
+        chartType: document.getElementById('chartType'),
+        chartDataInput: document.getElementById('chartDataInput'),
+        chartDataFileInfo: document.getElementById('chartDataFileInfo'),
+        chartDataMessage: document.getElementById('chartDataMessage'),
+        chartSourceControls: document.getElementById('chartSourceControls'),
+        chartSourceTitle: document.getElementById('chartSourceTitle'),
+        chartCsvControls: document.getElementById('chartCsvControls'),
+        chartCsvMode: document.getElementById('chartCsvMode'),
+        chartCsvObjectGroup: document.getElementById('chartCsvObjectGroup'),
+        chartCsvObject: document.getElementById('chartCsvObject'),
+        chartCsvRangeGroup: document.getElementById('chartCsvRangeGroup'),
+        chartCsvRangeStart: document.getElementById('chartCsvRangeStart'),
+        chartCsvRangeEnd: document.getElementById('chartCsvRangeEnd'),
+        chartCsvCategoryGroup: document.getElementById('chartCsvCategoryGroup'),
+        chartCsvCategory: document.getElementById('chartCsvCategory'),
+        chartJsonControls: document.getElementById('chartJsonControls'),
+        chartJsonMetric: document.getElementById('chartJsonMetric'),
+        chartJsonDateFrom: document.getElementById('chartJsonDateFrom'),
+        chartJsonDateTo: document.getElementById('chartJsonDateTo')
+    };
+
+    function createEmptySlide() {
+        const start = new Date();
+        const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return {
+            name: 'Новый слайд',
+            template_key: null,
+            kind: 'announcement',
+            start_date: start.toISOString(),
+            end_date: end.toISOString(),
+            is_active: true,
+            duration_slots: 1,
+            frequency_mode: 1,
+            hard_interval: null,
+            is_emergency: false,
+            alarm_type: null,
+            background: { type: 'color', value: '#07111f' },
+            elements: []
+        };
+    }
+
+    async function apiFetch(path, options = {}) {
+        const token = sessionStorage.getItem(TOKEN_KEY);
+        if (!token) {
+            location.href = '/';
+            throw new Error('Требуется авторизация');
+        }
+
+        const headers = new Headers(options.headers || {});
+        headers.set('Authorization', 'Bearer ' + token);
+        if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+            headers.set('Content-Type', 'application/json');
+        }
+
+        const response = await fetch(API_BASE + path, { ...options, headers });
+        if (response.status === 401) {
+            sessionStorage.removeItem(TOKEN_KEY);
+            location.href = '/';
+            throw new Error('Сессия истекла');
+        }
+        if (!response.ok) {
+            let message = 'Ошибка запроса';
+            try {
+                const data = await response.json();
+                message = data.detail || data.message || message;
+            } catch (_) {}
+            throw new Error(message);
+        }
+        return response.status === 204 ? null : response.json();
+    }
+
+    async function loadSlide() {
+        if (!slideId) {
+            syncSlideControls();
+            render();
+            return;
+        }
+
+        setStatus('Загрузка…');
+        try {
+            state.slide = await apiFetch('/slides/' + encodeURIComponent(slideId));
+            state.slide.background ||= { type: 'color', value: '#07111f' };
+            state.slide.elements ||= [];
+            refs.pageTitle.textContent = 'Редактирование: ' + state.slide.name;
+            syncSlideControls();
+            render();
+            setStatus('Загружено');
+        } catch (error) {
+            setStatus(error.message, true);
+        }
+    }
+
+    function addElement(type) {
+        const id = type + '-' + Date.now();
+        const common = { x: 200, y: 180, width: 700, height: 160, zIndex: nextZIndex() };
+        let element;
+
+        if (type === 'image') {
+            element = {
+                id, type: 'image', role: 'main_image', src: '', alt: '',
+                layout: { ...common, width: 560, height: 360, objectFit: 'cover' }
+            };
+        } else if (type === 'badge') {
+            element = {
+                id, type: 'badge', role: 'badge', value: 'БЕЙДЖ',
+                layout: {
+                    ...common,
+                    width: 300,
+                    height: 80,
+                    fontSize: 34,
+                    fontWeight: 700,
+                    fontStyle: 'normal',
+                    color: '#ffffff',
+                    align: 'center'
+                }
+            };
+        } else if (type === 'chart') {
+            element = {
+                id, type: 'chart', role: 'metric_chart',
+                chart: {
+                    chartType: 'bar',
+                    labels: ['Пн', 'Вт', 'Ср'],
+                    datasets: [{ label: 'Значение', data: [10, 20, 15] }]
+                },
+                layout: { ...common, width: 900, height: 480 }
+            };
+        } else {
+            element = {
+                id, type: 'text', role: 'body', value: 'Новый текст',
+                layout: {
+                    ...common,
+                    fontSize: 54,
+                    fontWeight: 400,
+                    fontStyle: 'normal',
+                    color: '#ffffff',
+                    align: 'left'
+                }
+            };
+        }
+
+        state.slide.elements.push(element);
+        state.selectedElementId = id;
+        render();
+    }
+
+    function nextZIndex() {
+        return Math.max(0, ...state.slide.elements.map(item => Number(item.layout?.zIndex || 0))) + 1;
+    }
+
+    function buildRenderableSlide() {
+        const slide = JSON.parse(JSON.stringify(state.slide));
+
+        const pendingBackground = pendingImage('background');
+        if (pendingBackground && slide.background?.type === 'image') {
+            slide.background.value = pendingBackground.previewUrl;
+        }
+
+        for (const element of slide.elements || []) {
+            if (element.type !== 'image') continue;
+            const pending = pendingImage(element.id);
+            if (pending) element.src = pending.previewUrl;
+        }
+
+        return slide;
+    }
+
+    function render() {
+        if (typeof createSlideNode !== 'function') {
+            setStatus('Не загружен общий модуль slide_rendering.js', true);
+            return;
+        }
+
+        refs.canvas.innerHTML = '';
+        refs.canvas.classList.toggle('preview-mode', state.preview);
+
+        const renderedSlide = buildRenderableSlide();
+        const slideNode = createSlideNode(renderedSlide);
+        slideNode.classList.add('editor-slide-canvas');
+        refs.canvas.appendChild(slideNode);
+
+        const renderedNodes = Array.from(slideNode.children);
+        state.slide.elements.forEach((element, index) => {
+            const node = renderedNodes[index];
+            if (node) decorateRenderedElement(node, element);
+        });
+
+        updateScale();
+        syncProperties();
+    }
+
+    function decorateRenderedElement(node, element) {
+        node.classList.add('canvas-element');
+        node.dataset.elementId = element.id;
+
+        if (element.type === 'image') {
+            const pending = pendingImage(element.id);
+            const source = pending?.previewUrl || element.src || '';
+            if (!source) node.classList.add('no-image');
+        }
+
+        if (!state.preview && element.id === state.selectedElementId) {
+            node.classList.add('selected');
+            appendResizeHandles(node, element);
+        }
+
+        node.addEventListener('pointerdown', event => beginElementDrag(event, node, element));
+        node.addEventListener('click', event => {
+            event.stopPropagation();
+            if (state.preview) return;
+            selectElement(element.id, node);
+        });
+    }
+
+    function appendResizeHandles(node, element) {
+        for (const direction of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
+            const handle = document.createElement('span');
+            handle.className = 'resize-handle';
+            handle.dataset.direction = direction;
+            handle.setAttribute('aria-hidden', 'true');
+            handle.addEventListener('pointerdown', event => beginElementResize(event, node, element, direction));
+            node.appendChild(handle);
+        }
+    }
+
+    function beginElementResize(event, node, element, direction) {
+        if (state.preview || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Не вызываем selectElement повторно для уже выбранного элемента.
+        // selectElement удаляет и создаёт resize-маркеры заново, поэтому
+        // исходный маркер исчезал прямо во время pointerdown.
+        if (state.selectedElementId !== element.id || !node.classList.contains('selected')) {
+            selectElement(element.id, node);
+        }
+
+        const layout = element.layout ||= {};
+        const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH || 1;
+        const startClientX = event.clientX;
+        const startClientY = event.clientY;
+        const pointerId = event.pointerId;
+        const start = {
+            x: Number(layout.x || 0),
+            y: Number(layout.y || 0),
+            width: Number(layout.width || 100),
+            height: Number(layout.height || 100)
+        };
+        const minWidth = 40;
+        const minHeight = 40;
+        const resizeCursor = getComputedStyle(event.currentTarget).cursor;
+        let changed = false;
+
+        const onMove = moveEvent => {
+            if (moveEvent.pointerId !== pointerId) return;
+
+            const deltaX = (moveEvent.clientX - startClientX) / scale;
+            const deltaY = (moveEvent.clientY - startClientY) / scale;
+
+            let x = start.x;
+            let y = start.y;
+            let width = start.width;
+            let height = start.height;
+
+            if (direction.includes('e')) {
+                width = clamp(start.width + deltaX, minWidth, CANVAS_WIDTH - start.x);
+            }
+            if (direction.includes('s')) {
+                height = clamp(start.height + deltaY, minHeight, CANVAS_HEIGHT - start.y);
+            }
+            if (direction.includes('w')) {
+                const right = start.x + start.width;
+                x = clamp(start.x + deltaX, 0, right - minWidth);
+                width = right - x;
+            }
+            if (direction.includes('n')) {
+                const bottom = start.y + start.height;
+                y = clamp(start.y + deltaY, 0, bottom - minHeight);
+                height = bottom - y;
+            }
+
+            layout.x = Math.round(x);
+            layout.y = Math.round(y);
+            layout.width = Math.round(width);
+            layout.height = Math.round(height);
+
+            node.style.left = layout.x + 'px';
+            node.style.top = layout.y + 'px';
+            node.style.width = layout.width + 'px';
+            node.style.height = layout.height + 'px';
+
+            refs.elementX.value = layout.x;
+            refs.elementY.value = layout.y;
+            refs.elementWidth.value = layout.width;
+            refs.elementHeight.value = layout.height;
+            changed = true;
+        };
+
+        const onEnd = endEvent => {
+            if (endEvent.pointerId !== pointerId) return;
+
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onEnd);
+            window.removeEventListener('pointercancel', onEnd);
+            document.body.style.cursor = '';
+
+            if (changed) setStatus('Изменено');
+        };
+
+        // Слушаем окно, а не сам маркер: resize продолжает работать,
+        // даже если курсор ушёл за его пределы.
+        document.body.style.cursor = resizeCursor;
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onEnd);
+        window.addEventListener('pointercancel', onEnd);
+    }
+
+    function selectElement(id, node = null) {
+        state.selectedElementId = id;
+        refs.canvas.querySelectorAll('.canvas-element.selected').forEach(item => {
+            item.classList.remove('selected');
+            item.querySelectorAll('.resize-handle').forEach(handle => handle.remove());
+        });
+
+        const target = node || refs.canvas.querySelector(`[data-element-id="${cssEscape(id)}"]`);
+        const element = state.slide.elements.find(item => item.id === id);
+        if (target) {
+            target.classList.add('selected');
+            if (element && !target.querySelector('.resize-handle')) appendResizeHandles(target, element);
+        }
+        syncProperties();
+    }
+
+    function cssEscape(value) {
+        if (window.CSS?.escape) return CSS.escape(String(value));
+        return String(value).replace(/["\\]/g, '\\$&');
+    }
+
+    function beginElementDrag(event, node, element) {
+        if (state.preview || event.button !== 0 || event.target.closest('.resize-handle')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        selectElement(element.id, node);
+
+        const layout = element.layout ||= {};
+        const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH || 1;
+        const startClientX = event.clientX;
+        const startClientY = event.clientY;
+        const startX = Number(layout.x || 0);
+        const startY = Number(layout.y || 0);
+        const width = Number(layout.width || 100);
+        const height = Number(layout.height || 100);
+        let moved = false;
+
+        node.setPointerCapture(event.pointerId);
+
+        const onMove = moveEvent => {
+            const deltaX = (moveEvent.clientX - startClientX) / scale;
+            const deltaY = (moveEvent.clientY - startClientY) / scale;
+            if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) moved = true;
+
+            layout.x = Math.round(clamp(startX + deltaX, 0, CANVAS_WIDTH - width));
+            layout.y = Math.round(clamp(startY + deltaY, 0, CANVAS_HEIGHT - height));
+            node.style.left = layout.x + 'px';
+            node.style.top = layout.y + 'px';
+            refs.elementX.value = layout.x;
+            refs.elementY.value = layout.y;
+        };
+
+        const onEnd = () => {
+            node.removeEventListener('pointermove', onMove);
+            node.removeEventListener('pointerup', onEnd);
+            node.removeEventListener('pointercancel', onEnd);
+            if (moved) setStatus('Изменено');
+        };
+
+        node.addEventListener('pointermove', onMove);
+        node.addEventListener('pointerup', onEnd);
+        node.addEventListener('pointercancel', onEnd);
+    }
+
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), Math.max(min, max));
+    }
+
+    function updateScale() {
+        const slideNode = refs.canvas.querySelector('.slide-canvas');
+        if (!slideNode) return;
+        scaleSlideCanvas(refs.canvas, slideNode);
+    }
+
+    function selectedElement() {
+        return state.slide.elements.find(item => item.id === state.selectedElementId) || null;
+    }
+
+    function syncSlideControls() {
+        refs.slideName.value = state.slide.name || '';
+        refs.slideKind.value = state.slide.kind || 'announcement';
+        refs.backgroundType.value = state.slide.background?.type || 'color';
+
+        const backgroundValue = state.slide.background?.value || '';
+        refs.backgroundColor.value = normalizeColor(backgroundValue, '#07111f');
+        refs.backgroundGradient.value = knownGradient(backgroundValue) ? backgroundValue : 'default';
+        syncBackgroundControls();
+    }
+
+    function syncBackgroundControls() {
+        const type = refs.backgroundType.value;
+        refs.backgroundColorControls.classList.toggle('hidden', type !== 'color');
+        refs.backgroundGradientControls.classList.toggle('hidden', type !== 'gradient');
+        refs.backgroundImageControls.classList.toggle('hidden', type !== 'image');
+
+        const pending = pendingImage('background');
+        const current = state.slide.background?.value || '';
+        refs.backgroundImageInfo.textContent = pending
+            ? 'Выбрано: ' + pending.file.name + ' — загрузится при сохранении'
+            : current
+                ? 'Текущее: ' + current
+                : 'Файл не выбран';
+    }
+
+    function syncProperties() {
+        const element = selectedElement();
+        refs.noSelection.classList.toggle('hidden', Boolean(element));
+        refs.properties.classList.toggle('hidden', !element);
+        if (!element) return;
+
+        const layout = element.layout || {};
+        const isText = element.type === 'text' || element.type === 'badge';
+        const isImage = element.type === 'image';
+        const isChart = element.type === 'chart';
+
+        refs.textProperties.classList.toggle('hidden', !isText);
+        refs.imageProperties.classList.toggle('hidden', !isImage);
+        refs.chartProperties.classList.toggle('hidden', !isChart);
+
+        refs.elementX.value = Number(layout.x || 0);
+        refs.elementY.value = Number(layout.y || 0);
+        refs.elementWidth.value = Number(layout.width || 100);
+        refs.elementHeight.value = Number(layout.height || 100);
+
+        if (isText) {
+            refs.elementValue.value = element.value || '';
+            refs.elementFontSize.value = Number(layout.fontSize || 40);
+            refs.elementColor.value = normalizeColor(layout.color || '#ffffff', '#ffffff');
+            refs.elementAlign.value = layout.align || layout.textAlign || 'left';
+            refs.elementBold.checked = isBoldWeight(layout.fontWeight);
+            refs.elementItalic.checked = ['italic', 'oblique'].includes(String(layout.fontStyle || '').toLowerCase());
+        }
+
+        if (isImage) {
+            refs.elementImageFit.value = layout.objectFit || layout.fit || 'cover';
+            const pending = pendingImage(element.id);
+            refs.elementImageInfo.textContent = pending
+                ? 'Выбрано: ' + pending.file.name + ' — загрузится при сохранении'
+                : element.src
+                    ? 'Текущее: ' + element.src
+                    : 'Файл не выбран';
+        }
+
+        if (isChart) {
+            refs.chartType.value = element.chart?.chartType || 'bar';
+            syncChartSourceControls(element);
+        }
+    }
+
+    function syncChartSourceControls(element) {
+        const source = state.chartSources.get(element.id) || null;
+        refs.chartDataMessage.textContent = '';
+        refs.chartDataMessage.className = 'form-message';
+        refs.chartSourceControls.classList.toggle('hidden', !source);
+        refs.chartCsvControls.classList.add('hidden');
+        refs.chartJsonControls.classList.add('hidden');
+
+        if (!source) {
+            refs.chartDataFileInfo.textContent = 'Файл не выбран в этой сессии. Сохранённые данные графика доступны как снимок.';
+            return;
+        }
+
+        refs.chartDataFileInfo.textContent = `Выбрано: ${source.fileName}. Файл хранится только в текущей вкладке.`;
+        refs.chartSourceTitle.textContent = source.format === 'csv' ? 'CSV-таблица' : 'JSON с производственными показателями';
+
+        if (source.format === 'csv') {
+            refs.chartCsvControls.classList.remove('hidden');
+            populateCsvControls(source);
+        } else {
+            refs.chartJsonControls.classList.remove('hidden');
+            populateJsonControls(source);
+        }
+        updateCsvControlVisibility();
+    }
+
+    function populateCsvControls(source) {
+        const { rows, categories } = source.data;
+        fillSelect(refs.chartCsvObject, rows.map((row, index) => ({ value: String(index), label: row.name })));
+        fillSelect(refs.chartCsvRangeStart, categories.map((label, index) => ({ value: String(index), label })));
+        fillSelect(refs.chartCsvRangeEnd, categories.map((label, index) => ({ value: String(index), label })));
+        fillSelect(refs.chartCsvCategory, categories.map((label, index) => ({ value: String(index), label })));
+
+        refs.chartCsvMode.value = source.config.mode;
+        refs.chartCsvObject.value = String(source.config.objectIndex);
+        refs.chartCsvRangeStart.value = String(source.config.rangeStart);
+        refs.chartCsvRangeEnd.value = String(source.config.rangeEnd);
+        refs.chartCsvCategory.value = String(source.config.categoryIndex);
+    }
+
+    function populateJsonControls(source) {
+        fillSelect(refs.chartJsonMetric, source.data.metrics.map(metric => ({
+            value: metric.key,
+            label: metric.unit ? `${metric.name} (${metric.unit})` : metric.name
+        })));
+        refs.chartJsonMetric.value = source.config.metricKey;
+        refs.chartJsonDateFrom.min = source.data.days[0]?.date || '';
+        refs.chartJsonDateFrom.max = source.data.days.at(-1)?.date || '';
+        refs.chartJsonDateTo.min = refs.chartJsonDateFrom.min;
+        refs.chartJsonDateTo.max = refs.chartJsonDateFrom.max;
+        refs.chartJsonDateFrom.value = source.config.from;
+        refs.chartJsonDateTo.value = source.config.to;
+    }
+
+    function fillSelect(select, options) {
+        select.innerHTML = '';
+        for (const optionData of options) {
+            const option = document.createElement('option');
+            option.value = optionData.value;
+            option.textContent = optionData.label;
+            select.appendChild(option);
+        }
+    }
+
+    function updateCsvControlVisibility() {
+        const isObjectMode = refs.chartCsvMode.value === 'object_by_categories';
+        refs.chartCsvObjectGroup.classList.toggle('hidden', !isObjectMode);
+        refs.chartCsvRangeGroup.classList.toggle('hidden', !isObjectMode);
+        refs.chartCsvCategoryGroup.classList.toggle('hidden', isObjectMode);
+    }
+
+    function showChartMessage(message, isError = false) {
+        refs.chartDataMessage.textContent = message;
+        refs.chartDataMessage.className = 'form-message ' + (isError ? 'error' : 'success');
+    }
+
+    function validateChartDataFile(file) {
+        if (!file) throw new Error('Файл не выбран');
+        const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+        if (!DATA_ACCEPTED_EXTENSIONS.includes(extension)) {
+            throw new Error('Можно выбрать только CSV или JSON');
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            throw new Error('Файл данных не должен превышать 5 МБ');
+        }
+        return extension;
+    }
+
+    async function loadChartDataFile(file) {
+        const element = selectedElement();
+        if (!element || element.type !== 'chart') throw new Error('Сначала выбери элемент графика');
+
+        const extension = validateChartDataFile(file);
+        const text = await file.text();
+        let source;
+
+        if (extension === 'csv') {
+            const data = normalizeWideCsv(text);
+            source = {
+                format: 'csv',
+                fileName: file.name,
+                data,
+                config: {
+                    mode: 'object_by_categories',
+                    objectIndex: 0,
+                    categoryIndex: 0,
+                    rangeStart: 0,
+                    rangeEnd: Math.max(0, data.categories.length - 1)
+                }
+            };
+        } else {
+            const data = normalizeMetricsJson(text);
+            source = {
+                format: 'json',
+                fileName: file.name,
+                data,
+                config: {
+                    metricKey: data.metrics[0].key,
+                    from: data.days[0].date,
+                    to: data.days.at(-1).date
+                }
+            };
+        }
+
+        state.chartSources.set(element.id, source);
+        syncChartSourceControls(element);
+        applyChartSourceToSelected();
+    }
+
+    function normalizeWideCsv(text) {
+        const cleanText = String(text).replace(/^\uFEFF/, '').trim();
+        if (!cleanText) throw new Error('CSV-файл пуст');
+
+        const firstLine = cleanText.split(/\r?\n/, 1)[0];
+        const delimiter = countUnquoted(firstLine, ';') > countUnquoted(firstLine, ',') ? ';' : ',';
+        const matrix = parseDelimitedText(cleanText, delimiter)
+            .filter(row => row.some(cell => String(cell).trim() !== ''));
+
+        if (matrix.length < 2 || matrix[0].length < 2) {
+            throw new Error('CSV должен содержать заголовок, минимум один объект и одну числовую колонку');
+        }
+
+        const header = matrix[0].map(cell => String(cell).trim());
+        const categories = header.slice(1).filter(Boolean);
+        if (!categories.length) throw new Error('В CSV не найдены дни или категории');
+
+        const rows = matrix.slice(1).map((row, rowIndex) => {
+            const name = String(row[0] ?? '').trim() || `Строка ${rowIndex + 1}`;
+            const values = categories.map((_, index) => parseMetricNumber(row[index + 1], `строка «${name}»`));
+            return { name, values };
+        });
+
+        return { objectHeader: header[0] || 'Объект', categories, rows };
+    }
+
+    function countUnquoted(text, delimiter) {
+        let quoted = false;
+        let count = 0;
+        for (let index = 0; index < text.length; index += 1) {
+            const char = text[index];
+            if (char === '"') quoted = !quoted;
+            else if (char === delimiter && !quoted) count += 1;
+        }
+        return count;
+    }
+
+    function parseDelimitedText(text, delimiter) {
+        const rows = [];
+        let row = [];
+        let cell = '';
+        let quoted = false;
+
+        for (let index = 0; index < text.length; index += 1) {
+            const char = text[index];
+            const next = text[index + 1];
+
+            if (char === '"') {
+                if (quoted && next === '"') {
+                    cell += '"';
+                    index += 1;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (char === delimiter && !quoted) {
+                row.push(cell);
+                cell = '';
+            } else if ((char === '\n' || char === '\r') && !quoted) {
+                if (char === '\r' && next === '\n') index += 1;
+                row.push(cell);
+                rows.push(row);
+                row = [];
+                cell = '';
+            } else {
+                cell += char;
+            }
+        }
+
+        row.push(cell);
+        rows.push(row);
+        return rows;
+    }
+
+    function parseMetricNumber(rawValue, context) {
+        const normalized = String(rawValue ?? '').trim().replace(/\s+/g, '').replace(',', '.');
+        const value = Number(normalized);
+        if (!Number.isFinite(value)) throw new Error(`Некорректное число в CSV: ${context}`);
+        return value;
+    }
+
+    function normalizeMetricsJson(text) {
+        let payload;
+        try {
+            payload = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+        } catch (_) {
+            throw new Error('JSON содержит синтаксическую ошибку');
+        }
+
+        if (!payload || !Array.isArray(payload.days) || !payload.days.length) {
+            throw new Error('Ожидается JSON со структурой days[].metrics[]');
+        }
+
+        const metricMap = new Map();
+        const days = payload.days.map((day, dayIndex) => {
+            const date = String(day?.date || '').slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Array.isArray(day.metrics)) {
+                throw new Error(`Некорректная запись дня №${dayIndex + 1}`);
+            }
+
+            const values = {};
+            for (const metric of day.metrics) {
+                const key = String(metric?.key || '').trim();
+                const name = String(metric?.name || key).trim();
+                const value = Number(metric?.value);
+                if (!key || !Number.isFinite(value)) continue;
+                values[key] = value;
+                if (!metricMap.has(key)) {
+                    metricMap.set(key, { key, name, unit: String(metric?.unit || '').trim() });
+                }
+            }
+            return { date, weekday: String(day.weekday || ''), values };
+        }).sort((left, right) => left.date.localeCompare(right.date));
+
+        const metrics = [...metricMap.values()];
+        if (!metrics.length) throw new Error('В JSON не найдено числовых показателей');
+        return { days, metrics };
+    }
+
+    function applyChartSourceToSelected() {
+        const element = selectedElement();
+        if (!element || element.type !== 'chart') return;
+        element.chart ||= { chartType: 'bar', labels: [], datasets: [] };
+        element.chart.chartType = refs.chartType.value;
+
+        const source = state.chartSources.get(element.id);
+        if (!source) {
+            render();
+            setStatus('Тип графика изменён');
+            return;
+        }
+
+        try {
+            if (source.format === 'csv') {
+                updateCsvSourceConfig(source);
+                buildChartFromCsv(element, source);
+            } else {
+                updateJsonSourceConfig(source);
+                buildChartFromJson(element, source);
+            }
+            render();
+            showChartMessage('График построен. В слайд сохранится текущий срез данных.');
+            setStatus('Данные графика изменены');
+        } catch (error) {
+            showChartMessage(error.message, true);
+            setStatus(error.message, true);
+        }
+    }
+
+    function updateCsvSourceConfig(source) {
+        source.config.mode = refs.chartCsvMode.value;
+        source.config.objectIndex = Number(refs.chartCsvObject.value || 0);
+        source.config.categoryIndex = Number(refs.chartCsvCategory.value || 0);
+        source.config.rangeStart = Number(refs.chartCsvRangeStart.value || 0);
+        source.config.rangeEnd = Number(refs.chartCsvRangeEnd.value || 0);
+    }
+
+    function buildChartFromCsv(element, source) {
+        const { rows, categories } = source.data;
+        const config = source.config;
+
+        if (config.mode === 'objects_by_category') {
+            const categoryIndex = clamp(config.categoryIndex, 0, categories.length - 1);
+            element.chart.labels = rows.map(row => row.name);
+            element.chart.datasets = [{
+                label: categories[categoryIndex],
+                data: rows.map(row => row.values[categoryIndex])
+            }];
+            return;
+        }
+
+        const objectIndex = clamp(config.objectIndex, 0, rows.length - 1);
+        const start = Math.min(config.rangeStart, config.rangeEnd);
+        const end = Math.max(config.rangeStart, config.rangeEnd);
+        const selectedCategories = categories.slice(start, end + 1);
+        const selectedValues = rows[objectIndex].values.slice(start, end + 1);
+        if (!selectedCategories.length) throw new Error('Выбран пустой диапазон CSV');
+
+        element.chart.labels = selectedCategories;
+        element.chart.datasets = [{ label: rows[objectIndex].name, data: selectedValues }];
+    }
+
+    function updateJsonSourceConfig(source) {
+        source.config.metricKey = refs.chartJsonMetric.value;
+        source.config.from = refs.chartJsonDateFrom.value;
+        source.config.to = refs.chartJsonDateTo.value;
+    }
+
+    function buildChartFromJson(element, source) {
+        const config = source.config;
+        if (!config.from || !config.to) throw new Error('Укажи диапазон дат');
+        if (config.from > config.to) throw new Error('Начальная дата позже конечной');
+
+        const metric = source.data.metrics.find(item => item.key === config.metricKey);
+        if (!metric) throw new Error('Выбранный показатель не найден');
+
+        const selectedDays = source.data.days.filter(day => day.date >= config.from && day.date <= config.to);
+        const points = selectedDays
+            .filter(day => Number.isFinite(day.values[metric.key]))
+            .map(day => ({ label: formatMetricDate(day.date), value: day.values[metric.key] }));
+
+        if (!points.length) throw new Error('В выбранном диапазоне нет данных');
+        element.chart.labels = points.map(point => point.label);
+        element.chart.datasets = [{
+            label: metric.unit ? `${metric.name}, ${metric.unit}` : metric.name,
+            data: points.map(point => point.value)
+        }];
+    }
+
+    function formatMetricDate(isoDate) {
+        const [, month, day] = String(isoDate).split('-');
+        return `${day}.${month}`;
+    }
+
+    function normalizeColor(value, fallback) {
+        return /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : fallback;
+    }
+
+    function knownGradient(value) {
+        return ['default', 'announcement', 'urgent', 'greeting', 'metric', 'light'].includes(value);
+    }
+
+    function isBoldWeight(value) {
+        const normalized = String(value || '').toLowerCase();
+        return normalized === 'bold' || normalized === 'bolder' || Number(value) >= 600;
+    }
+
+    function updateSelectedFromProperties() {
+        const element = selectedElement();
+        if (!element) return;
+        element.layout ||= {};
+
+        element.layout.x = Math.round(clamp(Number(refs.elementX.value || 0), 0, CANVAS_WIDTH - Number(refs.elementWidth.value || 1)));
+        element.layout.y = Math.round(clamp(Number(refs.elementY.value || 0), 0, CANVAS_HEIGHT - Number(refs.elementHeight.value || 1)));
+        element.layout.width = Math.max(1, Number(refs.elementWidth.value || 1));
+        element.layout.height = Math.max(1, Number(refs.elementHeight.value || 1));
+
+        if (element.type === 'text' || element.type === 'badge') {
+            element.value = refs.elementValue.value;
+            element.layout.fontSize = Math.max(1, Number(refs.elementFontSize.value || 1));
+            element.layout.color = refs.elementColor.value;
+            element.layout.align = refs.elementAlign.value;
+            element.layout.textAlign = refs.elementAlign.value;
+            element.layout.fontWeight = refs.elementBold.checked ? 700 : 400;
+            element.layout.fontStyle = refs.elementItalic.checked ? 'italic' : 'normal';
+        }
+
+        if (element.type === 'image') {
+            element.layout.objectFit = refs.elementImageFit.value;
+            element.layout.fit = refs.elementImageFit.value;
+        }
+
+        render();
+        setStatus('Изменено');
+    }
+
+    function duplicateSelected() {
+        const element = selectedElement();
+        if (!element) return;
+        const clone = structuredClone(element);
+        clone.id = element.type + '-' + Date.now();
+        clone.layout.x = Number(clone.layout.x || 0) + 40;
+        clone.layout.y = Number(clone.layout.y || 0) + 40;
+        clone.layout.zIndex = nextZIndex();
+        state.slide.elements.push(clone);
+        state.selectedElementId = clone.id;
+        render();
+        setStatus('Изменено');
+    }
+
+    function deleteSelected() {
+        if (!state.selectedElementId) return;
+        clearPendingImage(state.selectedElementId);
+        state.chartSources.delete(state.selectedElementId);
+        state.slide.elements = state.slide.elements.filter(item => item.id !== state.selectedElementId);
+        state.selectedElementId = null;
+        render();
+        setStatus('Изменено');
+    }
+
+    function validateImageFile(file) {
+        if (!file) throw new Error('Файл не выбран');
+        const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+        if (!file.type.startsWith('image/') || !IMAGE_ACCEPTED_EXTENSIONS.includes(extension)) {
+            throw new Error('Можно выбрать только JPG, PNG, WebP или GIF');
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            throw new Error('Изображение не должно превышать 10 МБ');
+        }
+    }
+
+    function setPendingImage(key, file) {
+        validateImageFile(file);
+        clearPendingImage(key);
+        state.pendingImages.set(key, {
+            file,
+            previewUrl: URL.createObjectURL(file)
+        });
+    }
+
+    function pendingImage(key) {
+        return state.pendingImages.get(key) || null;
+    }
+
+    function clearPendingImage(key) {
+        const pending = state.pendingImages.get(key);
+        if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl);
+        state.pendingImages.delete(key);
+    }
+
+    async function uploadImage(file, folder) {
+        const body = new FormData();
+        body.append('file', file);
+        const result = await apiFetch('/uploads/images?folder=' + encodeURIComponent(folder), {
+            method: 'POST',
+            body
+        });
+        if (!result?.url) throw new Error('Сервер не вернул адрес изображения');
+        return result.url;
+    }
+
+    async function commitPendingImages() {
+        const backgroundPending = pendingImage('background');
+        if (backgroundPending && state.slide.background?.type === 'image') {
+            setStatus('Загрузка фона…');
+            state.slide.background.value = await uploadImage(backgroundPending.file, 'backgrounds');
+            clearPendingImage('background');
+        }
+
+        const imageElements = state.slide.elements.filter(element => element.type === 'image');
+        for (const element of imageElements) {
+            const pending = pendingImage(element.id);
+            if (!pending) continue;
+            setStatus('Загрузка изображения…');
+            element.src = await uploadImage(pending.file, 'slides');
+            clearPendingImage(element.id);
+        }
+    }
+
+    async function saveSlide() {
+        syncStateFromSlideControls();
+        setStatus('Сохранение…');
+        refs.saveButton.disabled = true;
+        try {
+            await commitPendingImages();
+            const path = slideId ? '/slides/' + encodeURIComponent(slideId) : '/slides';
+            const method = slideId ? 'PUT' : 'POST';
+            const saved = await apiFetch(path, { method, body: JSON.stringify(state.slide) });
+            setStatus('Сохранено');
+            syncSlideControls();
+            render();
+            if (!slideId && saved?.id) location.replace('/editor.html?id=' + saved.id);
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            refs.saveButton.disabled = false;
+        }
+    }
+
+    function syncStateFromSlideControls() {
+        state.slide.name = refs.slideName.value.trim() || 'Без названия';
+        state.slide.kind = refs.slideKind.value;
+
+        const type = refs.backgroundType.value;
+        if (type === 'color') {
+            state.slide.background = { type, value: refs.backgroundColor.value };
+        } else if (type === 'gradient') {
+            state.slide.background = { type, value: refs.backgroundGradient.value };
+        } else {
+            state.slide.background = {
+                type,
+                value: state.slide.background?.type === 'image' ? (state.slide.background.value || '') : ''
+            };
+        }
+    }
+
+    function toLocalDateTimeValue(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const pad = number => String(number).padStart(2, '0');
+        return [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate())
+        ].join('-') + 'T' + [
+            pad(date.getHours()),
+            pad(date.getMinutes())
+        ].join(':');
+    }
+
+    function localDateTimeValueToIso(value) {
+        if (!value) return null;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    }
+
+    function updateDisplaySettingsVisibility() {
+        refs.displayHardIntervalGroup.classList.toggle(
+            'hidden',
+            refs.displayFrequencyMode.value !== '4'
+        );
+        refs.displayAlarmTypeGroup.classList.toggle(
+            'hidden',
+            !refs.displayIsEmergency.checked
+        );
+    }
+
+    function openDisplaySettings() {
+        syncStateFromSlideControls();
+        refs.displaySettingsMessage.textContent = '';
+        refs.displaySettingsMessage.className = 'form-message';
+        document.getElementById('displaySettingsSlideName').textContent = state.slide.name || 'Без названия';
+        refs.displayStartDate.value = toLocalDateTimeValue(state.slide.start_date);
+        refs.displayEndDate.value = toLocalDateTimeValue(state.slide.end_date);
+        refs.displayDurationSlots.value = String(state.slide.duration_slots || 1);
+        refs.displayFrequencyMode.value = String(state.slide.frequency_mode || 1);
+        refs.displayHardInterval.value = state.slide.hard_interval || 5;
+        refs.displayIsActive.checked = Boolean(state.slide.is_active);
+        refs.displayIsEmergency.checked = Boolean(state.slide.is_emergency);
+        refs.displayAlarmType.value = state.slide.alarm_type || '';
+        updateDisplaySettingsVisibility();
+        refs.displaySettingsModal.classList.remove('hidden');
+        refs.displayStartDate.focus();
+    }
+
+    function closeDisplaySettings() {
+        refs.displaySettingsModal.classList.add('hidden');
+        refs.displaySettingsMessage.textContent = '';
+        refs.displaySettingsMessage.className = 'form-message';
+    }
+
+    function applyDisplaySettings(event) {
+        event.preventDefault();
+
+        const startDate = localDateTimeValueToIso(refs.displayStartDate.value);
+        const endDate = localDateTimeValueToIso(refs.displayEndDate.value);
+        const durationSlots = Number(refs.displayDurationSlots.value);
+        const frequencyMode = Number(refs.displayFrequencyMode.value);
+        const hardInterval = Number(refs.displayHardInterval.value);
+        const isEmergency = refs.displayIsEmergency.checked;
+        const alarmType = refs.displayAlarmType.value.trim();
+
+        const showError = message => {
+            refs.displaySettingsMessage.textContent = message;
+            refs.displaySettingsMessage.className = 'form-message error';
+        };
+
+        if (!startDate || !endDate) {
+            showError('Укажи корректные даты показа');
+            return;
+        }
+        if (new Date(startDate).getTime() >= new Date(endDate).getTime()) {
+            showError('Дата окончания должна быть позже даты начала');
+            return;
+        }
+        if (!Number.isInteger(durationSlots) || durationSlots < 1 || durationSlots > 4) {
+            showError('Длительность должна быть от 1 до 4 слотов');
+            return;
+        }
+        if (![1, 2, 3, 4].includes(frequencyMode)) {
+            showError('Выбран некорректный режим частоты');
+            return;
+        }
+        if (frequencyMode === 4 && (!Number.isInteger(hardInterval) || hardInterval < 2)) {
+            showError('Для жёсткого режима нужен интервал не меньше 2');
+            return;
+        }
+        if (isEmergency && !alarmType) {
+            showError('Для экстренного слайда укажи тип тревоги');
+            return;
+        }
+
+        state.slide.start_date = startDate;
+        state.slide.end_date = endDate;
+        state.slide.duration_slots = durationSlots;
+        state.slide.frequency_mode = frequencyMode;
+        state.slide.hard_interval = frequencyMode === 4 ? hardInterval : null;
+        state.slide.is_active = refs.displayIsActive.checked;
+        state.slide.is_emergency = isEmergency;
+        state.slide.alarm_type = isEmergency ? alarmType : null;
+
+        refs.displaySettingsMessage.textContent = 'Параметры применены. Для отправки на сервер нажми «Сохранить».';
+        refs.displaySettingsMessage.className = 'form-message success';
+        setStatus('Параметры показа изменены');
+        window.setTimeout(closeDisplaySettings, 550);
+    }
+
+    function setStatus(text, isError = false) {
+        refs.statusText.textContent = text;
+        refs.statusText.style.color = isError ? '#c73535' : '';
+    }
+
+    function togglePreview() {
+        state.preview = !state.preview;
+        refs.previewButton.textContent = state.preview ? 'Вернуться к редактированию' : 'Предпросмотр';
+        refs.leftSidebar.classList.toggle('hidden', state.preview);
+        refs.rightSidebar.classList.toggle('hidden', state.preview);
+        refs.editor.style.gridTemplateColumns = state.preview ? '1fr' : '220px minmax(0, 1fr) 300px';
+        render();
+    }
+
+    document.querySelectorAll('[data-add]').forEach(button => {
+        button.addEventListener('click', () => addElement(button.dataset.add));
+    });
+
+    refs.canvas.addEventListener('click', () => {
+        if (state.preview) return;
+        state.selectedElementId = null;
+        render();
+    });
+
+    [refs.elementX, refs.elementY, refs.elementWidth, refs.elementHeight,
+     refs.elementFontSize, refs.elementColor, refs.elementAlign,
+     refs.elementValue, refs.elementBold, refs.elementItalic,
+     refs.elementImageFit].forEach(control => {
+        control.addEventListener('input', updateSelectedFromProperties);
+        control.addEventListener('change', updateSelectedFromProperties);
+    });
+
+    refs.slideName.addEventListener('input', () => {
+        syncStateFromSlideControls();
+        refs.pageTitle.textContent = slideId ? 'Редактирование: ' + state.slide.name : state.slide.name;
+        setStatus('Изменено');
+    });
+    refs.slideKind.addEventListener('change', () => {
+        syncStateFromSlideControls();
+        setStatus('Изменено');
+    });
+
+    refs.backgroundType.addEventListener('change', () => {
+        if (refs.backgroundType.value !== 'image') clearPendingImage('background');
+        syncStateFromSlideControls();
+        syncBackgroundControls();
+        render();
+        setStatus('Изменено');
+    });
+    refs.backgroundColor.addEventListener('input', () => {
+        syncStateFromSlideControls();
+        render();
+        setStatus('Изменено');
+    });
+    refs.backgroundGradient.addEventListener('change', () => {
+        syncStateFromSlideControls();
+        render();
+        setStatus('Изменено');
+    });
+
+    document.getElementById('chooseBackgroundImageButton').addEventListener('click', () => refs.backgroundImageInput.click());
+    refs.backgroundImageInput.addEventListener('change', () => {
+        try {
+            const file = refs.backgroundImageInput.files?.[0];
+            if (!file) return;
+            setPendingImage('background', file);
+            refs.backgroundType.value = 'image';
+            syncStateFromSlideControls();
+            syncBackgroundControls();
+            render();
+            setStatus('Фон выбран — загрузится при сохранении');
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            refs.backgroundImageInput.value = '';
+        }
+    });
+
+    document.getElementById('clearBackgroundImageButton').addEventListener('click', () => {
+        clearPendingImage('background');
+        if (state.slide.background?.type === 'image') state.slide.background.value = '';
+        syncBackgroundControls();
+        render();
+        setStatus('Изменено');
+    });
+
+    document.getElementById('chooseElementImageButton').addEventListener('click', () => {
+        if (selectedElement()?.type !== 'image') return;
+        refs.elementImageInput.click();
+    });
+    refs.elementImageInput.addEventListener('change', () => {
+        try {
+            const element = selectedElement();
+            const file = refs.elementImageInput.files?.[0];
+            if (!element || element.type !== 'image' || !file) return;
+            setPendingImage(element.id, file);
+            render();
+            setStatus('Изображение выбрано — загрузится при сохранении');
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            refs.elementImageInput.value = '';
+        }
+    });
+
+    document.getElementById('chooseChartDataButton').addEventListener('click', () => {
+        if (selectedElement()?.type !== 'chart') return;
+        refs.chartDataInput.click();
+    });
+
+    refs.chartDataInput.addEventListener('change', async () => {
+        try {
+            const file = refs.chartDataInput.files?.[0];
+            if (!file) return;
+            showChartMessage('Чтение файла…');
+            await loadChartDataFile(file);
+        } catch (error) {
+            showChartMessage(error.message, true);
+            setStatus(error.message, true);
+        } finally {
+            refs.chartDataInput.value = '';
+        }
+    });
+
+    refs.chartCsvMode.addEventListener('change', updateCsvControlVisibility);
+    refs.chartType.addEventListener('change', applyChartSourceToSelected);
+    document.getElementById('applyChartDataButton').addEventListener('click', applyChartSourceToSelected);
+
+    document.getElementById('duplicateButton').addEventListener('click', duplicateSelected);
+    document.getElementById('deleteButton').addEventListener('click', deleteSelected);
+    document.getElementById('saveButton').addEventListener('click', saveSlide);
+    document.getElementById('previewButton').addEventListener('click', togglePreview);
+    refs.displaySettingsButton.addEventListener('click', openDisplaySettings);
+    refs.displaySettingsForm.addEventListener('submit', applyDisplaySettings);
+    refs.displayFrequencyMode.addEventListener('change', updateDisplaySettingsVisibility);
+    refs.displayIsEmergency.addEventListener('change', updateDisplaySettingsVisibility);
+    document.getElementById('displaySettingsCancelButton').addEventListener('click', closeDisplaySettings);
+    document.getElementById('displaySettingsCloseButton').addEventListener('click', closeDisplaySettings);
+    refs.displaySettingsModal.addEventListener('click', event => {
+        if (event.target === refs.displaySettingsModal) closeDisplaySettings();
+    });
+    document.getElementById('backButton').addEventListener('click', () => { location.href = '/admin.html'; });
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('beforeunload', () => {
+        for (const key of [...state.pendingImages.keys()]) clearPendingImage(key);
+    });
+
+    loadSlide();
+})();
+</script>
 </body>
 </html>

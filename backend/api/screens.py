@@ -16,7 +16,10 @@ from backend import models, schemas
 from backend.auth import require_hr_or_admin
 from backend.config import config
 from backend.database import get_db
-from backend.routers.websocket import notify_screen_disabled
+from backend.routers.websocket import (
+    notify_screen_disabled,
+    notify_screens_updated,
+)
 from backend.screen_auth import (
     generate_pairing_code,
     pairing_expiry_from_now,
@@ -65,6 +68,7 @@ def generate_screen_code(
 )
 def create_screen(
     screen: schemas.ScreenCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     existing = (
@@ -85,6 +89,12 @@ def create_screen(
     db.add(db_screen)
     db.commit()
     db.refresh(db_screen)
+
+    background_tasks.add_task(
+        notify_screens_updated,
+        [db_screen.id],
+        "screen_created",
+    )
     return db_screen
 
 
@@ -107,6 +117,7 @@ def get_screen(
 def update_screen(
     screen_id: int,
     screen_data: schemas.ScreenUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     screen = _get_screen_or_404(db, screen_id)
@@ -114,6 +125,12 @@ def update_screen(
         setattr(screen, key, value)
     db.commit()
     db.refresh(screen)
+
+    background_tasks.add_task(
+        notify_screens_updated,
+        [screen.id],
+        "screen_updated",
+    )
     return screen
 
 
@@ -133,17 +150,32 @@ def delete_screen(
     )
     db.delete(screen)
     db.commit()
+
+    background_tasks.add_task(
+        notify_screens_updated,
+        [screen_id],
+        "screen_deleted",
+    )
     return {"ok": True}
 
 
 @router.post("/screens/{screen_id}/connect")
 def connect_screen(
     screen_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     screen = _get_screen_or_404(db, screen_id)
+    status_changed = not bool(screen.is_connected)
     screen.is_connected = True
     db.commit()
+
+    if status_changed:
+        background_tasks.add_task(
+            notify_screens_updated,
+            [screen.id],
+            "screen_connected",
+        )
     return {"ok": True, "message": f"Экран {screen.code} разрешён"}
 
 
@@ -154,6 +186,7 @@ def disconnect_screen(
     db: Session = Depends(get_db),
 ):
     screen = _get_screen_or_404(db, screen_id)
+    status_changed = bool(screen.is_connected) or bool(screen.is_online)
     screen.is_connected = False
     screen.is_online = False
     db.commit()
@@ -163,6 +196,12 @@ def disconnect_screen(
         screen.code,
         "Экран отключён администратором",
     )
+    if status_changed:
+        background_tasks.add_task(
+            notify_screens_updated,
+            [screen.id],
+            "screen_disconnected",
+        )
     return {"ok": True}
 
 
@@ -193,6 +232,12 @@ def reset_screen_pairing(
         code = rotate_screen_credentials(db, screen)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    background_tasks.add_task(
+        notify_screens_updated,
+        [screen.id],
+        "screen_pairing_reset",
+    )
 
     return schemas.ScreenPairingOut(
         screen_id=screen.id,
