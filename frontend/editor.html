@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Редактор слайда</title>
-    <style>
+    <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=PKUD5Xy7_cw2XbfEgkcHRRduFTit4zpd5Yi9m0WdGJraOsiGI2vB4QqjQB-0a59kXSLid5M1FwsHzRm4lJvN5Bsu_UHluhMoXImX2f2HCvzRKIvcMKaJg2X61c8uVisQlzq-Bo7TC-bqsBfD6zsGsURSNGYT5HcZJAsdgIr-Rn90OEDA_U4FgtP_2J-a9X-XhWtqlQhW56ExLKHhFbR5EeE56c05RtlJQKbjPw5KVl-X7hA54RNf5nsb4PiUsMBX0VjtzbiOPioDp5a2pw0UraKxdlRUf00VNyjgzP-2e8PC9TqHPpD49VBAokFw5wzE" charset="UTF-8"></script><style>
         :root {
             --panel: #ffffff;
             --border: #d9dee8;
@@ -106,30 +106,116 @@
             box-shadow: 0 14px 40px rgba(20, 31, 55, .22);
         }
 
-        .canvas {
+        .canvas-host {
             position: absolute;
             inset: 0;
-            width: 1920px;
-            height: 1080px;
-            transform-origin: top left;
             overflow: hidden;
-            background: #07111f;
+            background: #111827;
         }
 
-        .canvas-element {
+        /* Эти классы совпадают с index.html: редактор использует тот же DOM-рендерер. */
+        .slide-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: top left;
+            background: linear-gradient(135deg, #07111f, #111c33);
+        }
+
+        .bg-default { background: linear-gradient(135deg, #07111f, #111c33); }
+        .bg-announcement { background: linear-gradient(135deg, #173a71, #071b35 75%); }
+        .bg-urgent { background: linear-gradient(135deg, #852121, #2a0710 75%); }
+        .bg-image { background: linear-gradient(135deg, #111827, #020617 75%); }
+        .bg-greeting { background: radial-gradient(circle at 50% 15%, rgba(255,255,255,0.20), transparent 28%), linear-gradient(135deg, #b83a7d, #6e2fc9); }
+        .bg-metric { background: linear-gradient(135deg, #05110c, #0d2a1d 75%); }
+        .bg-light { background: linear-gradient(135deg, #f8fafc, #dbeafe); color: #0f172a; }
+
+        .slide-element {
             position: absolute;
             overflow: hidden;
+            color: inherit;
+        }
+        .slide-element.role-muted { opacity: .78; }
+        .slide-text {
+            display: flex;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.15;
+        }
+        .slide-text.align-left { text-align: left; justify-content: flex-start; }
+        .slide-text.align-center { text-align: center; justify-content: center; }
+        .slide-text.align-right { text-align: right; justify-content: flex-end; }
+        .slide-text.valign-top { align-items: flex-start; }
+        .slide-text.valign-middle { align-items: center; }
+        .slide-text.valign-bottom { align-items: flex-end; }
+        .slide-image-element img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+        .slide-image-element.fit-cover img { object-fit: cover; }
+        .slide-image-element.fit-fill img { object-fit: fill; }
+        .slide-image-element.shape-rounded img { border-radius: 28px; }
+        .slide-image-element.shape-circle img { border-radius: 50%; }
+        .slide-image-element.shadow-soft img { box-shadow: 0 24px 70px rgba(0,0,0,.45); }
+        .slide-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 24px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.14);
+            border: 1px solid rgba(255,255,255,.20);
+            backdrop-filter: blur(10px);
+            font-weight: 700;
+            letter-spacing: .02em;
+            white-space: nowrap;
+        }
+        .slide-chart {
+            background: rgba(0,0,0,.18);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 28px;
+            padding: 28px;
+        }
+        .slide-chart canvas { width: 100%; height: 100%; display: block; }
+        .metric-value {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Consolas, "Courier New", monospace;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        /* Редакторская обвязка поверх узлов общего рендера. */
+        .canvas-element {
             user-select: none;
             touch-action: none;
             cursor: grab;
         }
-
         .canvas-element:active { cursor: grabbing; }
-
+        .canvas-host.preview-mode .canvas-element { cursor: default; }
+        .canvas-element img,
+        .canvas-element canvas { pointer-events: none; }
         .canvas-element.selected {
             outline: 5px solid #315efb;
             outline-offset: 2px;
             overflow: visible;
+        }
+        .slide-image-element.no-image::before {
+            content: "Выбери изображение";
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            color: rgba(255,255,255,.8);
+            background: rgba(255,255,255,.1);
+            border: 3px dashed rgba(255,255,255,.45);
+            font-size: 36px;
         }
 
         .resize-handle {
@@ -153,39 +239,22 @@
         .resize-handle[data-direction="se"] { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
         .resize-handle[data-direction="sw"] { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
 
-        .canvas-element.text,
-        .canvas-element.badge {
-            display: flex;
-            align-items: center;
-            white-space: pre-wrap;
-        }
-
-        .canvas-element.image img {
-            width: 100%;
-            height: 100%;
-            display: block;
-            pointer-events: none;
-        }
-
-        .canvas-element.image.no-image::before {
-            content: "Выбери изображение";
+        .chart-source-block {
             display: grid;
-            place-items: center;
-            width: 100%;
-            height: 100%;
-            color: rgba(255,255,255,.8);
-            background: rgba(255,255,255,.1);
-            border: 3px dashed rgba(255,255,255,.45);
-            font-size: 36px;
+            gap: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: #f8fafc;
         }
 
-        .canvas-element.chart {
-            display: grid;
-            place-items: center;
-            background: rgba(255, 255, 255, .12);
-            color: #fff;
-            border: 2px dashed rgba(255, 255, 255, .5);
-            font-size: 42px;
+        .chart-source-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .03em;
         }
 
         .field { display: grid; gap: 5px; margin-bottom: 10px; }
@@ -361,7 +430,7 @@
 
     <main class="workspace" id="workspace">
         <div class="canvas-shell" id="canvasShell">
-            <section class="canvas" id="canvas" aria-label="Холст слайда 1920 на 1080"></section>
+            <div class="canvas-host" id="canvas" aria-label="Холст слайда 1920 на 1080"></div>
         </div>
     </main>
 
@@ -425,7 +494,80 @@
                 </div>
 
                 <div id="chartProperties" class="hidden">
-                    <p class="empty-note">График пока использует тестовые данные. Настройку метрик можно добавить следующим этапом.</p>
+                    <div class="field">
+                        <label for="chartType">Тип графика</label>
+                        <select id="chartType">
+                            <option value="bar">Столбчатый</option>
+                            <option value="line">Линейный</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Источник данных CSV / JSON</label>
+                        <div class="file-row">
+                            <button class="btn" id="chooseChartDataButton" type="button">Выбрать файл данных</button>
+                            <span class="file-info" id="chartDataFileInfo">Файл не выбран. Текущие данные графика останутся как снимок.</span>
+                        </div>
+                        <input id="chartDataInput" class="hidden" type="file"
+                               accept=".csv,.json,text/csv,application/csv,application/json">
+                    </div>
+
+                    <div class="chart-source-block hidden" id="chartSourceControls">
+                        <div class="chart-source-title" id="chartSourceTitle">Источник</div>
+
+                        <div id="chartCsvControls" class="hidden">
+                            <div class="field">
+                                <label for="chartCsvMode">Представление</label>
+                                <select id="chartCsvMode">
+                                    <option value="object_by_categories">Один объект по дням / категориям</option>
+                                    <option value="objects_by_category">Все объекты за один день / категорию</option>
+                                </select>
+                            </div>
+
+                            <div class="field" id="chartCsvObjectGroup">
+                                <label for="chartCsvObject">Объект / сотрудник</label>
+                                <select id="chartCsvObject"></select>
+                            </div>
+
+                            <div class="grid-2" id="chartCsvRangeGroup">
+                                <div class="field">
+                                    <label for="chartCsvRangeStart">Начало диапазона</label>
+                                    <select id="chartCsvRangeStart"></select>
+                                </div>
+                                <div class="field">
+                                    <label for="chartCsvRangeEnd">Конец диапазона</label>
+                                    <select id="chartCsvRangeEnd"></select>
+                                </div>
+                            </div>
+
+                            <div class="field hidden" id="chartCsvCategoryGroup">
+                                <label for="chartCsvCategory">День / категория</label>
+                                <select id="chartCsvCategory"></select>
+                            </div>
+                        </div>
+
+                        <div id="chartJsonControls" class="hidden">
+                            <div class="field">
+                                <label for="chartJsonMetric">Показатель</label>
+                                <select id="chartJsonMetric"></select>
+                            </div>
+                            <div class="grid-2">
+                                <div class="field">
+                                    <label for="chartJsonDateFrom">Дата от</label>
+                                    <input id="chartJsonDateFrom" type="date">
+                                </div>
+                                <div class="field">
+                                    <label for="chartJsonDateTo">Дата до</label>
+                                    <input id="chartJsonDateTo" type="date">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="applyChartDataButton" type="button">Построить график</button>
+                    </div>
+
+                    <div class="form-message" id="chartDataMessage"></div>
+                    <p class="field-hint">Файл читается только в текущей вкладке и не загружается на сервер. В слайд сохраняются уже выбранные подписи и числа.</p>
                 </div>
 
                 <div class="stack">
@@ -513,6 +655,8 @@
     </section>
 </div>
 
+<script src="utils.js"></script>
+<script src="slide_rendering.js"></script>
 <script>
 (() => {
     'use strict';
@@ -522,13 +666,15 @@
     const CANVAS_WIDTH = 1920;
     const CANVAS_HEIGHT = 1080;
     const IMAGE_ACCEPTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    const DATA_ACCEPTED_EXTENSIONS = ['csv', 'json'];
     const slideId = new URLSearchParams(location.search).get('id');
 
     const state = {
         slide: createEmptySlide(),
         selectedElementId: null,
         preview: false,
-        pendingImages: new Map()
+        pendingImages: new Map(),
+        chartSources: new Map()
     };
 
     const refs = {
@@ -582,7 +728,26 @@
         elementItalic: document.getElementById('elementItalic'),
         elementImageInput: document.getElementById('elementImageInput'),
         elementImageInfo: document.getElementById('elementImageInfo'),
-        elementImageFit: document.getElementById('elementImageFit')
+        elementImageFit: document.getElementById('elementImageFit'),
+        chartType: document.getElementById('chartType'),
+        chartDataInput: document.getElementById('chartDataInput'),
+        chartDataFileInfo: document.getElementById('chartDataFileInfo'),
+        chartDataMessage: document.getElementById('chartDataMessage'),
+        chartSourceControls: document.getElementById('chartSourceControls'),
+        chartSourceTitle: document.getElementById('chartSourceTitle'),
+        chartCsvControls: document.getElementById('chartCsvControls'),
+        chartCsvMode: document.getElementById('chartCsvMode'),
+        chartCsvObjectGroup: document.getElementById('chartCsvObjectGroup'),
+        chartCsvObject: document.getElementById('chartCsvObject'),
+        chartCsvRangeGroup: document.getElementById('chartCsvRangeGroup'),
+        chartCsvRangeStart: document.getElementById('chartCsvRangeStart'),
+        chartCsvRangeEnd: document.getElementById('chartCsvRangeEnd'),
+        chartCsvCategoryGroup: document.getElementById('chartCsvCategoryGroup'),
+        chartCsvCategory: document.getElementById('chartCsvCategory'),
+        chartJsonControls: document.getElementById('chartJsonControls'),
+        chartJsonMetric: document.getElementById('chartJsonMetric'),
+        chartJsonDateFrom: document.getElementById('chartJsonDateFrom'),
+        chartJsonDateTo: document.getElementById('chartJsonDateTo')
     };
 
     function createEmptySlide() {
@@ -713,76 +878,55 @@
         return Math.max(0, ...state.slide.elements.map(item => Number(item.layout?.zIndex || 0))) + 1;
     }
 
-    function render() {
-        renderBackground();
-        refs.canvas.innerHTML = '';
+    function buildRenderableSlide() {
+        const slide = JSON.parse(JSON.stringify(state.slide));
 
-        for (const element of state.slide.elements) {
-            refs.canvas.appendChild(renderElement(element));
+        const pendingBackground = pendingImage('background');
+        if (pendingBackground && slide.background?.type === 'image') {
+            slide.background.value = pendingBackground.previewUrl;
         }
+
+        for (const element of slide.elements || []) {
+            if (element.type !== 'image') continue;
+            const pending = pendingImage(element.id);
+            if (pending) element.src = pending.previewUrl;
+        }
+
+        return slide;
+    }
+
+    function render() {
+        if (typeof createSlideNode !== 'function') {
+            setStatus('Не загружен общий модуль slide_rendering.js', true);
+            return;
+        }
+
+        refs.canvas.innerHTML = '';
+        refs.canvas.classList.toggle('preview-mode', state.preview);
+
+        const renderedSlide = buildRenderableSlide();
+        const slideNode = createSlideNode(renderedSlide);
+        slideNode.classList.add('editor-slide-canvas');
+        refs.canvas.appendChild(slideNode);
+
+        const renderedNodes = Array.from(slideNode.children);
+        state.slide.elements.forEach((element, index) => {
+            const node = renderedNodes[index];
+            if (node) decorateRenderedElement(node, element);
+        });
 
         updateScale();
         syncProperties();
     }
 
-    function renderBackground() {
-        const background = state.slide.background || {};
-        refs.canvas.style.backgroundImage = '';
-        refs.canvas.style.backgroundColor = '#07111f';
-        refs.canvas.style.backgroundSize = '';
-        refs.canvas.style.backgroundPosition = '';
-
-        if (background.type === 'color') {
-            refs.canvas.style.backgroundColor = normalizeColor(background.value || '#07111f', '#07111f');
-        } else if (background.type === 'image') {
-            const pending = pendingImage('background');
-            const source = pending?.previewUrl || background.value || '';
-            if (source) {
-                refs.canvas.style.backgroundImage = `url("${String(source).replace(/"/g, '\\"')}")`;
-                refs.canvas.style.backgroundSize = 'cover';
-                refs.canvas.style.backgroundPosition = 'center';
-            }
-        } else {
-            refs.canvas.style.backgroundImage = gradientValue(background.value);
-        }
-    }
-
-    function gradientValue(value) {
-        const presets = {
-            default: 'linear-gradient(135deg, #07111f, #111c33)',
-            announcement: 'linear-gradient(135deg, #173a71, #071b35 75%)',
-            urgent: 'linear-gradient(135deg, #852121, #2a0710 75%)',
-            greeting: 'radial-gradient(circle at 50% 15%, rgba(255,255,255,0.20), transparent 28%), linear-gradient(135deg, #b83a7d, #6e2fc9)',
-            metric: 'linear-gradient(135deg, #05110c, #0d2a1d 75%)',
-            light: 'linear-gradient(135deg, #f8fafc, #dbeafe)'
-        };
-        return presets[value] || presets.default;
-    }
-
-    function renderElement(element) {
-        const node = document.createElement('div');
-        const layout = element.layout || {};
-        node.className = 'canvas-element ' + element.type;
+    function decorateRenderedElement(node, element) {
+        node.classList.add('canvas-element');
         node.dataset.elementId = element.id;
-        applyElementLayout(node, element);
 
         if (element.type === 'image') {
             const pending = pendingImage(element.id);
             const source = pending?.previewUrl || element.src || '';
-            if (source) {
-                const image = document.createElement('img');
-                image.src = source;
-                image.alt = element.alt || '';
-                image.draggable = false;
-                image.style.objectFit = layout.objectFit || layout.fit || 'cover';
-                node.appendChild(image);
-            } else {
-                node.classList.add('no-image');
-            }
-        } else if (element.type === 'chart') {
-            node.textContent = 'График — настройка будет добавлена';
-        } else {
-            node.textContent = String(element.value || '');
+            if (!source) node.classList.add('no-image');
         }
 
         if (!state.preview && element.id === state.selectedElementId) {
@@ -796,8 +940,6 @@
             if (state.preview) return;
             selectElement(element.id, node);
         });
-
-        return node;
     }
 
     function appendResizeHandles(node, element) {
@@ -903,21 +1045,6 @@
         window.addEventListener('pointercancel', onEnd);
     }
 
-    function applyElementLayout(node, element) {
-        const layout = element.layout || {};
-        node.style.left = Number(layout.x || 0) + 'px';
-        node.style.top = Number(layout.y || 0) + 'px';
-        node.style.width = Number(layout.width || 100) + 'px';
-        node.style.height = Number(layout.height || 100) + 'px';
-        node.style.zIndex = Number(layout.zIndex || 1);
-        node.style.fontSize = Number(layout.fontSize || 40) + 'px';
-        node.style.fontWeight = String(layout.fontWeight || 400);
-        node.style.fontStyle = ['italic', 'oblique'].includes(String(layout.fontStyle).toLowerCase()) ? layout.fontStyle : 'normal';
-        node.style.color = layout.color || '#ffffff';
-        node.style.justifyContent = alignmentToFlex(layout.align || layout.textAlign);
-        node.style.textAlign = layout.align || layout.textAlign || 'left';
-    }
-
     function selectElement(id, node = null) {
         state.selectedElementId = id;
         refs.canvas.querySelectorAll('.canvas-element.selected').forEach(item => {
@@ -986,15 +1113,10 @@
         return Math.min(Math.max(value, min), Math.max(min, max));
     }
 
-    function alignmentToFlex(value) {
-        if (value === 'center') return 'center';
-        if (value === 'right') return 'flex-end';
-        return 'flex-start';
-    }
-
     function updateScale() {
-        const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH;
-        refs.canvas.style.transform = `scale(${scale})`;
+        const slideNode = refs.canvas.querySelector('.slide-canvas');
+        if (!slideNode) return;
+        scaleSlideCanvas(refs.canvas, slideNode);
     }
 
     function selectedElement() {
@@ -1065,6 +1187,353 @@
                     ? 'Текущее: ' + element.src
                     : 'Файл не выбран';
         }
+
+        if (isChart) {
+            refs.chartType.value = element.chart?.chartType || 'bar';
+            syncChartSourceControls(element);
+        }
+    }
+
+    function syncChartSourceControls(element) {
+        const source = state.chartSources.get(element.id) || null;
+        refs.chartDataMessage.textContent = '';
+        refs.chartDataMessage.className = 'form-message';
+        refs.chartSourceControls.classList.toggle('hidden', !source);
+        refs.chartCsvControls.classList.add('hidden');
+        refs.chartJsonControls.classList.add('hidden');
+
+        if (!source) {
+            refs.chartDataFileInfo.textContent = 'Файл не выбран в этой сессии. Сохранённые данные графика доступны как снимок.';
+            return;
+        }
+
+        refs.chartDataFileInfo.textContent = `Выбрано: ${source.fileName}. Файл хранится только в текущей вкладке.`;
+        refs.chartSourceTitle.textContent = source.format === 'csv' ? 'CSV-таблица' : 'JSON с производственными показателями';
+
+        if (source.format === 'csv') {
+            refs.chartCsvControls.classList.remove('hidden');
+            populateCsvControls(source);
+        } else {
+            refs.chartJsonControls.classList.remove('hidden');
+            populateJsonControls(source);
+        }
+        updateCsvControlVisibility();
+    }
+
+    function populateCsvControls(source) {
+        const { rows, categories } = source.data;
+        fillSelect(refs.chartCsvObject, rows.map((row, index) => ({ value: String(index), label: row.name })));
+        fillSelect(refs.chartCsvRangeStart, categories.map((label, index) => ({ value: String(index), label })));
+        fillSelect(refs.chartCsvRangeEnd, categories.map((label, index) => ({ value: String(index), label })));
+        fillSelect(refs.chartCsvCategory, categories.map((label, index) => ({ value: String(index), label })));
+
+        refs.chartCsvMode.value = source.config.mode;
+        refs.chartCsvObject.value = String(source.config.objectIndex);
+        refs.chartCsvRangeStart.value = String(source.config.rangeStart);
+        refs.chartCsvRangeEnd.value = String(source.config.rangeEnd);
+        refs.chartCsvCategory.value = String(source.config.categoryIndex);
+    }
+
+    function populateJsonControls(source) {
+        fillSelect(refs.chartJsonMetric, source.data.metrics.map(metric => ({
+            value: metric.key,
+            label: metric.unit ? `${metric.name} (${metric.unit})` : metric.name
+        })));
+        refs.chartJsonMetric.value = source.config.metricKey;
+        refs.chartJsonDateFrom.min = source.data.days[0]?.date || '';
+        refs.chartJsonDateFrom.max = source.data.days.at(-1)?.date || '';
+        refs.chartJsonDateTo.min = refs.chartJsonDateFrom.min;
+        refs.chartJsonDateTo.max = refs.chartJsonDateFrom.max;
+        refs.chartJsonDateFrom.value = source.config.from;
+        refs.chartJsonDateTo.value = source.config.to;
+    }
+
+    function fillSelect(select, options) {
+        select.innerHTML = '';
+        for (const optionData of options) {
+            const option = document.createElement('option');
+            option.value = optionData.value;
+            option.textContent = optionData.label;
+            select.appendChild(option);
+        }
+    }
+
+    function updateCsvControlVisibility() {
+        const isObjectMode = refs.chartCsvMode.value === 'object_by_categories';
+        refs.chartCsvObjectGroup.classList.toggle('hidden', !isObjectMode);
+        refs.chartCsvRangeGroup.classList.toggle('hidden', !isObjectMode);
+        refs.chartCsvCategoryGroup.classList.toggle('hidden', isObjectMode);
+    }
+
+    function showChartMessage(message, isError = false) {
+        refs.chartDataMessage.textContent = message;
+        refs.chartDataMessage.className = 'form-message ' + (isError ? 'error' : 'success');
+    }
+
+    function validateChartDataFile(file) {
+        if (!file) throw new Error('Файл не выбран');
+        const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+        if (!DATA_ACCEPTED_EXTENSIONS.includes(extension)) {
+            throw new Error('Можно выбрать только CSV или JSON');
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            throw new Error('Файл данных не должен превышать 5 МБ');
+        }
+        return extension;
+    }
+
+    async function loadChartDataFile(file) {
+        const element = selectedElement();
+        if (!element || element.type !== 'chart') throw new Error('Сначала выбери элемент графика');
+
+        const extension = validateChartDataFile(file);
+        const text = await file.text();
+        let source;
+
+        if (extension === 'csv') {
+            const data = normalizeWideCsv(text);
+            source = {
+                format: 'csv',
+                fileName: file.name,
+                data,
+                config: {
+                    mode: 'object_by_categories',
+                    objectIndex: 0,
+                    categoryIndex: 0,
+                    rangeStart: 0,
+                    rangeEnd: Math.max(0, data.categories.length - 1)
+                }
+            };
+        } else {
+            const data = normalizeMetricsJson(text);
+            source = {
+                format: 'json',
+                fileName: file.name,
+                data,
+                config: {
+                    metricKey: data.metrics[0].key,
+                    from: data.days[0].date,
+                    to: data.days.at(-1).date
+                }
+            };
+        }
+
+        state.chartSources.set(element.id, source);
+        syncChartSourceControls(element);
+        applyChartSourceToSelected();
+    }
+
+    function normalizeWideCsv(text) {
+        const cleanText = String(text).replace(/^\uFEFF/, '').trim();
+        if (!cleanText) throw new Error('CSV-файл пуст');
+
+        const firstLine = cleanText.split(/\r?\n/, 1)[0];
+        const delimiter = countUnquoted(firstLine, ';') > countUnquoted(firstLine, ',') ? ';' : ',';
+        const matrix = parseDelimitedText(cleanText, delimiter)
+            .filter(row => row.some(cell => String(cell).trim() !== ''));
+
+        if (matrix.length < 2 || matrix[0].length < 2) {
+            throw new Error('CSV должен содержать заголовок, минимум один объект и одну числовую колонку');
+        }
+
+        const header = matrix[0].map(cell => String(cell).trim());
+        const categories = header.slice(1).filter(Boolean);
+        if (!categories.length) throw new Error('В CSV не найдены дни или категории');
+
+        const rows = matrix.slice(1).map((row, rowIndex) => {
+            const name = String(row[0] ?? '').trim() || `Строка ${rowIndex + 1}`;
+            const values = categories.map((_, index) => parseMetricNumber(row[index + 1], `строка «${name}»`));
+            return { name, values };
+        });
+
+        return { objectHeader: header[0] || 'Объект', categories, rows };
+    }
+
+    function countUnquoted(text, delimiter) {
+        let quoted = false;
+        let count = 0;
+        for (let index = 0; index < text.length; index += 1) {
+            const char = text[index];
+            if (char === '"') quoted = !quoted;
+            else if (char === delimiter && !quoted) count += 1;
+        }
+        return count;
+    }
+
+    function parseDelimitedText(text, delimiter) {
+        const rows = [];
+        let row = [];
+        let cell = '';
+        let quoted = false;
+
+        for (let index = 0; index < text.length; index += 1) {
+            const char = text[index];
+            const next = text[index + 1];
+
+            if (char === '"') {
+                if (quoted && next === '"') {
+                    cell += '"';
+                    index += 1;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (char === delimiter && !quoted) {
+                row.push(cell);
+                cell = '';
+            } else if ((char === '\n' || char === '\r') && !quoted) {
+                if (char === '\r' && next === '\n') index += 1;
+                row.push(cell);
+                rows.push(row);
+                row = [];
+                cell = '';
+            } else {
+                cell += char;
+            }
+        }
+
+        row.push(cell);
+        rows.push(row);
+        return rows;
+    }
+
+    function parseMetricNumber(rawValue, context) {
+        const normalized = String(rawValue ?? '').trim().replace(/\s+/g, '').replace(',', '.');
+        const value = Number(normalized);
+        if (!Number.isFinite(value)) throw new Error(`Некорректное число в CSV: ${context}`);
+        return value;
+    }
+
+    function normalizeMetricsJson(text) {
+        let payload;
+        try {
+            payload = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+        } catch (_) {
+            throw new Error('JSON содержит синтаксическую ошибку');
+        }
+
+        if (!payload || !Array.isArray(payload.days) || !payload.days.length) {
+            throw new Error('Ожидается JSON со структурой days[].metrics[]');
+        }
+
+        const metricMap = new Map();
+        const days = payload.days.map((day, dayIndex) => {
+            const date = String(day?.date || '').slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Array.isArray(day.metrics)) {
+                throw new Error(`Некорректная запись дня №${dayIndex + 1}`);
+            }
+
+            const values = {};
+            for (const metric of day.metrics) {
+                const key = String(metric?.key || '').trim();
+                const name = String(metric?.name || key).trim();
+                const value = Number(metric?.value);
+                if (!key || !Number.isFinite(value)) continue;
+                values[key] = value;
+                if (!metricMap.has(key)) {
+                    metricMap.set(key, { key, name, unit: String(metric?.unit || '').trim() });
+                }
+            }
+            return { date, weekday: String(day.weekday || ''), values };
+        }).sort((left, right) => left.date.localeCompare(right.date));
+
+        const metrics = [...metricMap.values()];
+        if (!metrics.length) throw new Error('В JSON не найдено числовых показателей');
+        return { days, metrics };
+    }
+
+    function applyChartSourceToSelected() {
+        const element = selectedElement();
+        if (!element || element.type !== 'chart') return;
+        element.chart ||= { chartType: 'bar', labels: [], datasets: [] };
+        element.chart.chartType = refs.chartType.value;
+
+        const source = state.chartSources.get(element.id);
+        if (!source) {
+            render();
+            setStatus('Тип графика изменён');
+            return;
+        }
+
+        try {
+            if (source.format === 'csv') {
+                updateCsvSourceConfig(source);
+                buildChartFromCsv(element, source);
+            } else {
+                updateJsonSourceConfig(source);
+                buildChartFromJson(element, source);
+            }
+            render();
+            showChartMessage('График построен. В слайд сохранится текущий срез данных.');
+            setStatus('Данные графика изменены');
+        } catch (error) {
+            showChartMessage(error.message, true);
+            setStatus(error.message, true);
+        }
+    }
+
+    function updateCsvSourceConfig(source) {
+        source.config.mode = refs.chartCsvMode.value;
+        source.config.objectIndex = Number(refs.chartCsvObject.value || 0);
+        source.config.categoryIndex = Number(refs.chartCsvCategory.value || 0);
+        source.config.rangeStart = Number(refs.chartCsvRangeStart.value || 0);
+        source.config.rangeEnd = Number(refs.chartCsvRangeEnd.value || 0);
+    }
+
+    function buildChartFromCsv(element, source) {
+        const { rows, categories } = source.data;
+        const config = source.config;
+
+        if (config.mode === 'objects_by_category') {
+            const categoryIndex = clamp(config.categoryIndex, 0, categories.length - 1);
+            element.chart.labels = rows.map(row => row.name);
+            element.chart.datasets = [{
+                label: categories[categoryIndex],
+                data: rows.map(row => row.values[categoryIndex])
+            }];
+            return;
+        }
+
+        const objectIndex = clamp(config.objectIndex, 0, rows.length - 1);
+        const start = Math.min(config.rangeStart, config.rangeEnd);
+        const end = Math.max(config.rangeStart, config.rangeEnd);
+        const selectedCategories = categories.slice(start, end + 1);
+        const selectedValues = rows[objectIndex].values.slice(start, end + 1);
+        if (!selectedCategories.length) throw new Error('Выбран пустой диапазон CSV');
+
+        element.chart.labels = selectedCategories;
+        element.chart.datasets = [{ label: rows[objectIndex].name, data: selectedValues }];
+    }
+
+    function updateJsonSourceConfig(source) {
+        source.config.metricKey = refs.chartJsonMetric.value;
+        source.config.from = refs.chartJsonDateFrom.value;
+        source.config.to = refs.chartJsonDateTo.value;
+    }
+
+    function buildChartFromJson(element, source) {
+        const config = source.config;
+        if (!config.from || !config.to) throw new Error('Укажи диапазон дат');
+        if (config.from > config.to) throw new Error('Начальная дата позже конечной');
+
+        const metric = source.data.metrics.find(item => item.key === config.metricKey);
+        if (!metric) throw new Error('Выбранный показатель не найден');
+
+        const selectedDays = source.data.days.filter(day => day.date >= config.from && day.date <= config.to);
+        const points = selectedDays
+            .filter(day => Number.isFinite(day.values[metric.key]))
+            .map(day => ({ label: formatMetricDate(day.date), value: day.values[metric.key] }));
+
+        if (!points.length) throw new Error('В выбранном диапазоне нет данных');
+        element.chart.labels = points.map(point => point.label);
+        element.chart.datasets = [{
+            label: metric.unit ? `${metric.name}, ${metric.unit}` : metric.name,
+            data: points.map(point => point.value)
+        }];
+    }
+
+    function formatMetricDate(isoDate) {
+        const [, month, day] = String(isoDate).split('-');
+        return `${day}.${month}`;
     }
 
     function normalizeColor(value, fallback) {
@@ -1126,6 +1595,7 @@
     function deleteSelected() {
         if (!state.selectedElementId) return;
         clearPendingImage(state.selectedElementId);
+        state.chartSources.delete(state.selectedElementId);
         state.slide.elements = state.slide.elements.filter(item => item.id !== state.selectedElementId);
         state.selectedElementId = null;
         render();
@@ -1385,17 +1855,17 @@
         if (refs.backgroundType.value !== 'image') clearPendingImage('background');
         syncStateFromSlideControls();
         syncBackgroundControls();
-        renderBackground();
+        render();
         setStatus('Изменено');
     });
     refs.backgroundColor.addEventListener('input', () => {
         syncStateFromSlideControls();
-        renderBackground();
+        render();
         setStatus('Изменено');
     });
     refs.backgroundGradient.addEventListener('change', () => {
         syncStateFromSlideControls();
-        renderBackground();
+        render();
         setStatus('Изменено');
     });
 
@@ -1408,7 +1878,7 @@
             refs.backgroundType.value = 'image';
             syncStateFromSlideControls();
             syncBackgroundControls();
-            renderBackground();
+            render();
             setStatus('Фон выбран — загрузится при сохранении');
         } catch (error) {
             setStatus(error.message, true);
@@ -1421,7 +1891,7 @@
         clearPendingImage('background');
         if (state.slide.background?.type === 'image') state.slide.background.value = '';
         syncBackgroundControls();
-        renderBackground();
+        render();
         setStatus('Изменено');
     });
 
@@ -1443,6 +1913,29 @@
             refs.elementImageInput.value = '';
         }
     });
+
+    document.getElementById('chooseChartDataButton').addEventListener('click', () => {
+        if (selectedElement()?.type !== 'chart') return;
+        refs.chartDataInput.click();
+    });
+
+    refs.chartDataInput.addEventListener('change', async () => {
+        try {
+            const file = refs.chartDataInput.files?.[0];
+            if (!file) return;
+            showChartMessage('Чтение файла…');
+            await loadChartDataFile(file);
+        } catch (error) {
+            showChartMessage(error.message, true);
+            setStatus(error.message, true);
+        } finally {
+            refs.chartDataInput.value = '';
+        }
+    });
+
+    refs.chartCsvMode.addEventListener('change', updateCsvControlVisibility);
+    refs.chartType.addEventListener('change', applyChartSourceToSelected);
+    document.getElementById('applyChartDataButton').addEventListener('click', applyChartSourceToSelected);
 
     document.getElementById('duplicateButton').addEventListener('click', duplicateSelected);
     document.getElementById('deleteButton').addEventListener('click', deleteSelected);
