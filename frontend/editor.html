@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Редактор слайда</title>
-    <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=cOc6Pj73xFPFGonYXlqEtXfLZwWbxSY1xGJ5ZKXJT__IALhchvdywF2BkNIf0ta-A5K095K0_UQvZg62j1BL1KEGamnv3UC3aqY70kIEhe00gxpMr3FivTNo-U1ZsR31WiDAOdW_dNa_dVLora-t-HYvgaz5ZD8emkWvUANsSnwVIRlWUq3NwNemkLPn_AjeG6CsapitMsFSntRBskhyWYmulYHW2FaT0k-Q3OHWt-jRmAtjLg6BPtldZEY1HFJLK3ItEXVbRlh8it0DrOYmmsL9V2e1t2w8lZ9kubokn24bPDJzTKXP1OM9x0oyon7n" charset="UTF-8"></script><link rel="stylesheet" crossorigin="anonymous" href="https://gc.kis.v2.scr.kaspersky-labs.com/E3E8934C-235A-4B0E-825A-35A08381A191/abn/main.css?attr=aHR0cHM6Ly9jaGF0Z3B0LmNvbS9iYWNrZW5kLWFwaS9lc3R1YXJ5L2NvbnRlbnQ_aWQ9ZmlsZV8wMDAwMDAwMGUxMjQ3MWY0YmUxMzE1ZGQwNzc1Yzk2ZSZmbj1lZGl0b3IlMjgxJTI5Lmh0bWwmY2Q9YXR0YWNobWVudCZ0cz00OTU1NjkmcD1mcyZjaWQ9MSZzaWc9M2I1NmVhMDc2MTA4NjNhZTczZTBhNDgwOGVmYzAzZDUxY2Q3YzI3ZDg1NWZlMmZlNWZlMzYzOWJiZDgxNTc0OCZ2PTA"/><style>
+    <style>
         :root {
             --panel: #ffffff;
             --border: #d9dee8;
@@ -129,7 +129,29 @@
         .canvas-element.selected {
             outline: 5px solid #315efb;
             outline-offset: 2px;
+            overflow: visible;
         }
+
+        .resize-handle {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 4px solid #ffffff;
+            border-radius: 5px;
+            background: var(--accent);
+            box-shadow: 0 2px 7px rgba(0, 0, 0, .28);
+            z-index: 10000;
+            touch-action: none;
+        }
+
+        .resize-handle[data-direction="n"]  { left: 50%; top: 0; transform: translate(-50%, -50%); cursor: ns-resize; }
+        .resize-handle[data-direction="s"]  { left: 50%; bottom: 0; transform: translate(-50%, 50%); cursor: ns-resize; }
+        .resize-handle[data-direction="e"]  { right: 0; top: 50%; transform: translate(50%, -50%); cursor: ew-resize; }
+        .resize-handle[data-direction="w"]  { left: 0; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+        .resize-handle[data-direction="ne"] { right: 0; top: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+        .resize-handle[data-direction="nw"] { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+        .resize-handle[data-direction="se"] { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
+        .resize-handle[data-direction="sw"] { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
 
         .canvas-element.text,
         .canvas-element.badge {
@@ -145,7 +167,7 @@
             pointer-events: none;
         }
 
-        .canvas-element.image:empty::before {
+        .canvas-element.image.no-image::before {
             content: "Выбери изображение";
             display: grid;
             place-items: center;
@@ -202,6 +224,61 @@
         }
 
         .empty-note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 20000;
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, .62);
+        }
+
+        .modal {
+            width: min(620px, 100%);
+            max-height: calc(100vh - 40px);
+            overflow: auto;
+            border-radius: 14px;
+            background: #ffffff;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .35);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h2 { margin: 0; font-size: 19px; }
+        .modal-body { padding: 20px; }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .form-message {
+            min-height: 20px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .form-message.error { color: var(--danger); }
+        .form-message.success { color: #15803d; }
+        .field-hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
+        .modal-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 42px;
+            font-size: 13px;
+        }
+        .modal-checkbox input { width: auto; }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -213,6 +290,7 @@
         <span class="status" id="statusText">Готово</span>
         <div class="spacer"></div>
         <button class="btn" id="previewButton" type="button">Предпросмотр</button>
+        <button class="btn" id="displaySettingsButton" type="button">Параметры показа</button>
         <button class="btn btn-primary" id="saveButton" type="button">Сохранить</button>
     </header>
 
@@ -359,6 +437,82 @@
     </aside>
 </div>
 
+<div class="modal-backdrop hidden" id="displaySettingsModal" role="dialog" aria-modal="true" aria-labelledby="displaySettingsTitle">
+    <section class="modal">
+        <header class="modal-header">
+            <div>
+                <h2 id="displaySettingsTitle">Параметры показа</h2>
+                <div class="status" id="displaySettingsSlideName"></div>
+            </div>
+            <button class="btn" id="displaySettingsCloseButton" type="button" aria-label="Закрыть">✕</button>
+        </header>
+
+        <form class="modal-body" id="displaySettingsForm">
+            <div class="grid-2">
+                <div class="field">
+                    <label for="displayStartDate">Дата начала</label>
+                    <input id="displayStartDate" type="datetime-local" required>
+                </div>
+                <div class="field">
+                    <label for="displayEndDate">Дата окончания</label>
+                    <input id="displayEndDate" type="datetime-local" required>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="field">
+                    <label for="displayDurationSlots">Длительность показа</label>
+                    <select id="displayDurationSlots">
+                        <option value="1">1 слот</option>
+                        <option value="2">2 слота</option>
+                        <option value="3">3 слота</option>
+                        <option value="4">4 слота</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="displayFrequencyMode">Частота показа</label>
+                    <select id="displayFrequencyMode">
+                        <option value="1">Обычная</option>
+                        <option value="2">Повышенная</option>
+                        <option value="3">Высокая</option>
+                        <option value="4">Жёсткий интервал</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="field hidden" id="displayHardIntervalGroup">
+                <label for="displayHardInterval">Жёсткий интервал</label>
+                <input id="displayHardInterval" type="number" min="2" step="1" value="5">
+                <div class="field-hint">Используется только для режима «Жёсткий интервал».</div>
+            </div>
+
+            <div class="grid-2">
+                <label class="modal-checkbox" for="displayIsActive">
+                    <input id="displayIsActive" type="checkbox">
+                    <span>Разрешить показ слайда</span>
+                </label>
+                <label class="modal-checkbox" for="displayIsEmergency">
+                    <input id="displayIsEmergency" type="checkbox">
+                    <span>Экстренный слайд</span>
+                </label>
+            </div>
+
+            <div class="field hidden" id="displayAlarmTypeGroup">
+                <label for="displayAlarmType">Тип тревоги</label>
+                <input id="displayAlarmType" maxlength="50" placeholder="Например: fire">
+            </div>
+
+            <div class="field-hint">Изменения применяются к открытому слайду локально. На сервер они попадут только после нажатия основной кнопки «Сохранить».</div>
+            <div class="form-message" id="displaySettingsMessage"></div>
+
+            <div class="modal-actions">
+                <button class="btn" id="displaySettingsCancelButton" type="button">Отмена</button>
+                <button class="btn btn-primary" type="submit">Применить</button>
+            </div>
+        </form>
+    </section>
+</div>
+
 <script>
 (() => {
     'use strict';
@@ -387,6 +541,20 @@
         statusText: document.getElementById('statusText'),
         saveButton: document.getElementById('saveButton'),
         previewButton: document.getElementById('previewButton'),
+        displaySettingsButton: document.getElementById('displaySettingsButton'),
+        displaySettingsModal: document.getElementById('displaySettingsModal'),
+        displaySettingsForm: document.getElementById('displaySettingsForm'),
+        displaySettingsMessage: document.getElementById('displaySettingsMessage'),
+        displayStartDate: document.getElementById('displayStartDate'),
+        displayEndDate: document.getElementById('displayEndDate'),
+        displayDurationSlots: document.getElementById('displayDurationSlots'),
+        displayFrequencyMode: document.getElementById('displayFrequencyMode'),
+        displayHardIntervalGroup: document.getElementById('displayHardIntervalGroup'),
+        displayHardInterval: document.getElementById('displayHardInterval'),
+        displayIsActive: document.getElementById('displayIsActive'),
+        displayIsEmergency: document.getElementById('displayIsEmergency'),
+        displayAlarmTypeGroup: document.getElementById('displayAlarmTypeGroup'),
+        displayAlarmType: document.getElementById('displayAlarmType'),
         slideName: document.getElementById('slideName'),
         slideKind: document.getElementById('slideKind'),
         backgroundType: document.getElementById('backgroundType'),
@@ -608,6 +776,8 @@
                 image.draggable = false;
                 image.style.objectFit = layout.objectFit || layout.fit || 'cover';
                 node.appendChild(image);
+            } else {
+                node.classList.add('no-image');
             }
         } else if (element.type === 'chart') {
             node.textContent = 'График — настройка будет добавлена';
@@ -615,7 +785,10 @@
             node.textContent = String(element.value || '');
         }
 
-        if (!state.preview && element.id === state.selectedElementId) node.classList.add('selected');
+        if (!state.preview && element.id === state.selectedElementId) {
+            node.classList.add('selected');
+            appendResizeHandles(node, element);
+        }
 
         node.addEventListener('pointerdown', event => beginElementDrag(event, node, element));
         node.addEventListener('click', event => {
@@ -625,6 +798,96 @@
         });
 
         return node;
+    }
+
+    function appendResizeHandles(node, element) {
+        for (const direction of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
+            const handle = document.createElement('span');
+            handle.className = 'resize-handle';
+            handle.dataset.direction = direction;
+            handle.setAttribute('aria-hidden', 'true');
+            handle.addEventListener('pointerdown', event => beginElementResize(event, node, element, direction));
+            node.appendChild(handle);
+        }
+    }
+
+    function beginElementResize(event, node, element, direction) {
+        if (state.preview || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        selectElement(element.id, node);
+
+        const layout = element.layout ||= {};
+        const scale = refs.canvasShell.clientWidth / CANVAS_WIDTH || 1;
+        const startClientX = event.clientX;
+        const startClientY = event.clientY;
+        const start = {
+            x: Number(layout.x || 0),
+            y: Number(layout.y || 0),
+            width: Number(layout.width || 100),
+            height: Number(layout.height || 100)
+        };
+        const minWidth = 40;
+        const minHeight = 40;
+        const handle = event.currentTarget;
+        let changed = false;
+
+        handle.setPointerCapture(event.pointerId);
+
+        const onMove = moveEvent => {
+            const deltaX = (moveEvent.clientX - startClientX) / scale;
+            const deltaY = (moveEvent.clientY - startClientY) / scale;
+
+            let x = start.x;
+            let y = start.y;
+            let width = start.width;
+            let height = start.height;
+
+            if (direction.includes('e')) {
+                width = clamp(start.width + deltaX, minWidth, CANVAS_WIDTH - start.x);
+            }
+            if (direction.includes('s')) {
+                height = clamp(start.height + deltaY, minHeight, CANVAS_HEIGHT - start.y);
+            }
+            if (direction.includes('w')) {
+                const right = start.x + start.width;
+                x = clamp(start.x + deltaX, 0, right - minWidth);
+                width = right - x;
+            }
+            if (direction.includes('n')) {
+                const bottom = start.y + start.height;
+                y = clamp(start.y + deltaY, 0, bottom - minHeight);
+                height = bottom - y;
+            }
+
+            layout.x = Math.round(x);
+            layout.y = Math.round(y);
+            layout.width = Math.round(width);
+            layout.height = Math.round(height);
+
+            node.style.left = layout.x + 'px';
+            node.style.top = layout.y + 'px';
+            node.style.width = layout.width + 'px';
+            node.style.height = layout.height + 'px';
+
+            refs.elementX.value = layout.x;
+            refs.elementY.value = layout.y;
+            refs.elementWidth.value = layout.width;
+            refs.elementHeight.value = layout.height;
+            changed = true;
+        };
+
+        const onEnd = () => {
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onEnd);
+            handle.removeEventListener('pointercancel', onEnd);
+            if (changed) setStatus('Изменено');
+        };
+
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onEnd);
+        handle.addEventListener('pointercancel', onEnd);
     }
 
     function applyElementLayout(node, element) {
@@ -644,8 +907,17 @@
 
     function selectElement(id, node = null) {
         state.selectedElementId = id;
-        refs.canvas.querySelectorAll('.canvas-element.selected').forEach(item => item.classList.remove('selected'));
-        (node || refs.canvas.querySelector(`[data-element-id="${cssEscape(id)}"]`))?.classList.add('selected');
+        refs.canvas.querySelectorAll('.canvas-element.selected').forEach(item => {
+            item.classList.remove('selected');
+            item.querySelectorAll('.resize-handle').forEach(handle => handle.remove());
+        });
+
+        const target = node || refs.canvas.querySelector(`[data-element-id="${cssEscape(id)}"]`);
+        const element = state.slide.elements.find(item => item.id === id);
+        if (target) {
+            target.classList.add('selected');
+            if (element && !target.querySelector('.resize-handle')) appendResizeHandles(target, element);
+        }
         syncProperties();
     }
 
@@ -655,7 +927,7 @@
     }
 
     function beginElementDrag(event, node, element) {
-        if (state.preview || event.button !== 0) return;
+        if (state.preview || event.button !== 0 || event.target.closest('.resize-handle')) return;
         event.preventDefault();
         event.stopPropagation();
         selectElement(element.id, node);
@@ -943,6 +1215,117 @@
         }
     }
 
+    function toLocalDateTimeValue(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const pad = number => String(number).padStart(2, '0');
+        return [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate())
+        ].join('-') + 'T' + [
+            pad(date.getHours()),
+            pad(date.getMinutes())
+        ].join(':');
+    }
+
+    function localDateTimeValueToIso(value) {
+        if (!value) return null;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    }
+
+    function updateDisplaySettingsVisibility() {
+        refs.displayHardIntervalGroup.classList.toggle(
+            'hidden',
+            refs.displayFrequencyMode.value !== '4'
+        );
+        refs.displayAlarmTypeGroup.classList.toggle(
+            'hidden',
+            !refs.displayIsEmergency.checked
+        );
+    }
+
+    function openDisplaySettings() {
+        syncStateFromSlideControls();
+        refs.displaySettingsMessage.textContent = '';
+        refs.displaySettingsMessage.className = 'form-message';
+        document.getElementById('displaySettingsSlideName').textContent = state.slide.name || 'Без названия';
+        refs.displayStartDate.value = toLocalDateTimeValue(state.slide.start_date);
+        refs.displayEndDate.value = toLocalDateTimeValue(state.slide.end_date);
+        refs.displayDurationSlots.value = String(state.slide.duration_slots || 1);
+        refs.displayFrequencyMode.value = String(state.slide.frequency_mode || 1);
+        refs.displayHardInterval.value = state.slide.hard_interval || 5;
+        refs.displayIsActive.checked = Boolean(state.slide.is_active);
+        refs.displayIsEmergency.checked = Boolean(state.slide.is_emergency);
+        refs.displayAlarmType.value = state.slide.alarm_type || '';
+        updateDisplaySettingsVisibility();
+        refs.displaySettingsModal.classList.remove('hidden');
+        refs.displayStartDate.focus();
+    }
+
+    function closeDisplaySettings() {
+        refs.displaySettingsModal.classList.add('hidden');
+        refs.displaySettingsMessage.textContent = '';
+        refs.displaySettingsMessage.className = 'form-message';
+    }
+
+    function applyDisplaySettings(event) {
+        event.preventDefault();
+
+        const startDate = localDateTimeValueToIso(refs.displayStartDate.value);
+        const endDate = localDateTimeValueToIso(refs.displayEndDate.value);
+        const durationSlots = Number(refs.displayDurationSlots.value);
+        const frequencyMode = Number(refs.displayFrequencyMode.value);
+        const hardInterval = Number(refs.displayHardInterval.value);
+        const isEmergency = refs.displayIsEmergency.checked;
+        const alarmType = refs.displayAlarmType.value.trim();
+
+        const showError = message => {
+            refs.displaySettingsMessage.textContent = message;
+            refs.displaySettingsMessage.className = 'form-message error';
+        };
+
+        if (!startDate || !endDate) {
+            showError('Укажи корректные даты показа');
+            return;
+        }
+        if (new Date(startDate).getTime() >= new Date(endDate).getTime()) {
+            showError('Дата окончания должна быть позже даты начала');
+            return;
+        }
+        if (!Number.isInteger(durationSlots) || durationSlots < 1 || durationSlots > 4) {
+            showError('Длительность должна быть от 1 до 4 слотов');
+            return;
+        }
+        if (![1, 2, 3, 4].includes(frequencyMode)) {
+            showError('Выбран некорректный режим частоты');
+            return;
+        }
+        if (frequencyMode === 4 && (!Number.isInteger(hardInterval) || hardInterval < 2)) {
+            showError('Для жёсткого режима нужен интервал не меньше 2');
+            return;
+        }
+        if (isEmergency && !alarmType) {
+            showError('Для экстренного слайда укажи тип тревоги');
+            return;
+        }
+
+        state.slide.start_date = startDate;
+        state.slide.end_date = endDate;
+        state.slide.duration_slots = durationSlots;
+        state.slide.frequency_mode = frequencyMode;
+        state.slide.hard_interval = frequencyMode === 4 ? hardInterval : null;
+        state.slide.is_active = refs.displayIsActive.checked;
+        state.slide.is_emergency = isEmergency;
+        state.slide.alarm_type = isEmergency ? alarmType : null;
+
+        refs.displaySettingsMessage.textContent = 'Параметры применены. Для отправки на сервер нажми «Сохранить».';
+        refs.displaySettingsMessage.className = 'form-message success';
+        setStatus('Параметры показа изменены');
+        window.setTimeout(closeDisplaySettings, 550);
+    }
+
     function setStatus(text, isError = false) {
         refs.statusText.textContent = text;
         refs.statusText.style.color = isError ? '#c73535' : '';
@@ -1052,6 +1435,15 @@
     document.getElementById('deleteButton').addEventListener('click', deleteSelected);
     document.getElementById('saveButton').addEventListener('click', saveSlide);
     document.getElementById('previewButton').addEventListener('click', togglePreview);
+    refs.displaySettingsButton.addEventListener('click', openDisplaySettings);
+    refs.displaySettingsForm.addEventListener('submit', applyDisplaySettings);
+    refs.displayFrequencyMode.addEventListener('change', updateDisplaySettingsVisibility);
+    refs.displayIsEmergency.addEventListener('change', updateDisplaySettingsVisibility);
+    document.getElementById('displaySettingsCancelButton').addEventListener('click', closeDisplaySettings);
+    document.getElementById('displaySettingsCloseButton').addEventListener('click', closeDisplaySettings);
+    refs.displaySettingsModal.addEventListener('click', event => {
+        if (event.target === refs.displaySettingsModal) closeDisplaySettings();
+    });
     document.getElementById('backButton').addEventListener('click', () => { location.href = '/admin.html'; });
     window.addEventListener('resize', updateScale);
     window.addEventListener('beforeunload', () => {
