@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from backend import auth, crud, models
 from backend.config import config
 from backend.database import get_db
 from backend.rate_limit import SlidingWindowRateLimiter
+from backend.routers.websocket import notify_users_updated
 from backend.schemas import (
     LoginResponse,
     PasswordChange,
@@ -251,13 +252,14 @@ def get_user_by_id(
 )
 def create_new_user(
     user_data: UserCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     _ensure_username_available(db, user_data.username)
     _ensure_email_available(db, str(user_data.email) if user_data.email else None)
 
     try:
-        return crud.create_user(db, user_data)
+        created_user = crud.create_user(db, user_data)
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -265,11 +267,19 @@ def create_new_user(
             detail="Пользователь с такими данными уже существует",
         ) from exc
 
+    background_tasks.add_task(
+        notify_users_updated,
+        [created_user.id],
+        "user_created",
+    )
+    return created_user
+
 
 @admin_router.put("/users/{user_id}", response_model=UserOut)
 def update_existing_user(
     user_id: int,
     user_data: UserUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     user = crud.get_user(db, user_id)
@@ -302,12 +312,19 @@ def update_existing_user(
 
     if updated_user is None:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    background_tasks.add_task(
+        notify_users_updated,
+        [updated_user.id],
+        "user_updated",
+    )
     return updated_user
 
 
 @admin_router.delete("/users/{user_id}")
 def delete_existing_user(
     user_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin: models.User = Depends(auth.require_admin),
 ):
@@ -329,6 +346,11 @@ def delete_existing_user(
         )
 
     crud.delete_user(db, user_id)
+    background_tasks.add_task(
+        notify_users_updated,
+        [user_id],
+        "user_deleted",
+    )
     return {"ok": True}
 
 

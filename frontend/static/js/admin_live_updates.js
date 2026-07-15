@@ -6,33 +6,70 @@
     ) + "//" + window.location.host + "/ws/admin";
 
     const RECONNECT_DELAY_MS = 3000;
-    const SLIDE_RELOAD_DEBOUNCE_MS = 100;
+    const RELOAD_DEBOUNCE_MS = 100;
 
     let websocket = null;
     let reconnectTimer = null;
     let slideReloadTimer = null;
+    let screenReloadTimer = null;
+    let userReloadTimer = null;
     let statusBoundaryTimer = null;
     let slidesLoadPromise = null;
+    let screensLoadPromise = null;
+    let usersLoadPromise = null;
     let stopped = false;
+    let socketRole = "";
     let cachedSlides = [];
 
     const originalLoadSlides = loadSlides;
+    const originalLoadScreens = loadScreens;
+    const originalLoadUsers = loadUsers;
     const originalRenderSlides = renderSlides;
 
-    // Объединяет одновременные причины обновления: начальную загрузку,
-    // собственный CRUD и WebSocket-событие. В один момент выполняется
-    // не более одного GET /api/slides.
-    loadSlides = function loadSlidesDeduplicated() {
-        if (slidesLoadPromise !== null) {
-            return slidesLoadPromise;
+    function parseDateForStatus(value) {
+        if (typeof parseServerDate === "function") {
+            return parseServerDate(value);
         }
+        return new Date(value);
+    }
 
-        slidesLoadPromise = Promise.resolve(originalLoadSlides());
-        slidesLoadPromise = slidesLoadPromise.finally(function finishSlidesLoad() {
-            slidesLoadPromise = null;
-        });
-        return slidesLoadPromise;
-    };
+    function wrapDeduplicatedLoad(originalLoad, getPromise, setPromise) {
+        return function deduplicatedLoad() {
+            const activePromise = getPromise();
+            if (activePromise !== null) {
+                return activePromise;
+            }
+
+            let nextPromise = Promise.resolve(originalLoad());
+            setPromise(nextPromise);
+
+            nextPromise = nextPromise.finally(function finishLoad() {
+                setPromise(null);
+            });
+            setPromise(nextPromise);
+            return nextPromise;
+        };
+    }
+
+    // Одновременные причины обновления объединяются. Например, собственный
+    // CRUD-запрос и WebSocket-событие не запускают два параллельных GET.
+    loadSlides = wrapDeduplicatedLoad(
+        originalLoadSlides,
+        function getSlidesPromise() { return slidesLoadPromise; },
+        function setSlidesPromise(value) { slidesLoadPromise = value; }
+    );
+
+    loadScreens = wrapDeduplicatedLoad(
+        originalLoadScreens,
+        function getScreensPromise() { return screensLoadPromise; },
+        function setScreensPromise(value) { screensLoadPromise = value; }
+    );
+
+    loadUsers = wrapDeduplicatedLoad(
+        originalLoadUsers,
+        function getUsersPromise() { return usersLoadPromise; },
+        function setUsersPromise(value) { usersLoadPromise = value; }
+    );
 
     function scheduleNextStatusBoundary() {
         if (statusBoundaryTimer !== null) {
@@ -44,8 +81,8 @@
         let nextBoundary = null;
 
         for (const slide of cachedSlides) {
-            const start = parseServerDate(slide.start_date).getTime();
-            const end = parseServerDate(slide.end_date).getTime();
+            const start = parseDateForStatus(slide.start_date).getTime();
+            const end = parseDateForStatus(slide.end_date).getTime();
 
             if (!Number.isNaN(start) && start > now) {
                 nextBoundary = nextBoundary === null
@@ -72,25 +109,55 @@
         );
     }
 
-    // Сохраняет последнюю коллекцию и планирует локальную перерисовку
-    // ровно на ближайшее начало/окончание показа. HTTP-запросов здесь нет.
+    // Начало и окончание показа меняют статус слайда без изменения БД.
+    // Поэтому интерфейс перерисовывается локально на ближайшей границе дат.
     renderSlides = function renderSlidesWithLiveStatuses(slides) {
         cachedSlides = Array.isArray(slides) ? slides : [];
         originalRenderSlides(cachedSlides);
         scheduleNextStatusBoundary();
     };
 
-    function scheduleSlidesReload(delayMs = SLIDE_RELOAD_DEBOUNCE_MS) {
-        if (slideReloadTimer !== null) {
-            window.clearTimeout(slideReloadTimer);
+    function scheduleReload(timerName, callback, delayMs = RELOAD_DEBOUNCE_MS) {
+        let currentTimer = null;
+
+        if (timerName === "slides") currentTimer = slideReloadTimer;
+        if (timerName === "screens") currentTimer = screenReloadTimer;
+        if (timerName === "users") currentTimer = userReloadTimer;
+
+        if (currentTimer !== null) {
+            window.clearTimeout(currentTimer);
         }
 
-        slideReloadTimer = window.setTimeout(function reloadSlidesAfterEvent() {
-            slideReloadTimer = null;
-            Promise.resolve(loadSlides()).catch(function ignoreHandledLoadError() {
-                // loadSlides самостоятельно показывает ошибку в интерфейсе.
+        const timer = window.setTimeout(function reloadAfterEvent() {
+            if (timerName === "slides") slideReloadTimer = null;
+            if (timerName === "screens") screenReloadTimer = null;
+            if (timerName === "users") userReloadTimer = null;
+
+            Promise.resolve(callback()).catch(function ignoreHandledLoadError() {
+                // Существующие load-функции сами отображают ошибки в интерфейсе.
             });
         }, delayMs);
+
+        if (timerName === "slides") slideReloadTimer = timer;
+        if (timerName === "screens") screenReloadTimer = timer;
+        if (timerName === "users") userReloadTimer = timer;
+    }
+
+    function scheduleSlidesReload(delayMs = RELOAD_DEBOUNCE_MS) {
+        scheduleReload("slides", loadSlides, delayMs);
+    }
+
+    function scheduleScreensReload(delayMs = RELOAD_DEBOUNCE_MS) {
+        scheduleReload("screens", loadScreens, delayMs);
+    }
+
+    function canLoadUsers() {
+        return socketRole === "admin";
+    }
+
+    function scheduleUsersReload(delayMs = RELOAD_DEBOUNCE_MS) {
+        if (!canLoadUsers()) return;
+        scheduleReload("users", loadUsers, delayMs);
     }
 
     function sendMessage(message) {
@@ -103,6 +170,16 @@
         }
     }
 
+    function redirectToLogin() {
+        if (typeof clearAuthAndRedirect === "function") {
+            clearAuthAndRedirect();
+            return;
+        }
+
+        localStorage.removeItem("token");
+        window.location.href = "/main.html";
+    }
+
     function scheduleReconnect() {
         if (stopped || reconnectTimer !== null) return;
 
@@ -110,6 +187,12 @@
             reconnectTimer = null;
             connectAdminWebSocket();
         }, RECONNECT_DELAY_MS);
+    }
+
+    function synchronizeAllVisibleData() {
+        scheduleSlidesReload(0);
+        scheduleScreensReload(0);
+        scheduleUsersReload(0);
     }
 
     function connectAdminWebSocket() {
@@ -157,21 +240,32 @@
             }
 
             if (type === "authenticated") {
-                // За время установки или reconnect могли произойти изменения.
-                scheduleSlidesReload(0);
+                socketRole = String(message.role || "").toLowerCase();
+
+                // За время установки соединения или reconnect могли произойти
+                // изменения. Выполняется одна сверка, а не polling.
+                synchronizeAllVisibleData();
                 return;
             }
 
             if (type === "slides_updated") {
-                // WebSocket сообщает только о факте изменения.
-                // Полная актуальная модель по-прежнему загружается через REST.
                 scheduleSlidesReload();
+                return;
+            }
+
+            if (type === "screens_updated") {
+                scheduleScreensReload();
+                return;
+            }
+
+            if (type === "users_updated") {
+                scheduleUsersReload();
                 return;
             }
 
             if (type === "auth_failed") {
                 stopped = true;
-                clearAuthAndRedirect();
+                redirectToLogin();
             }
         };
 
@@ -192,8 +286,9 @@
     document.addEventListener("visibilitychange", function handleVisibilityChange() {
         if (document.visibilityState !== "visible") return;
 
-        // После сна вкладки или временного разрыва сразу сверяем данные.
-        scheduleSlidesReload(0);
+        // Браузер мог приостановить вкладку или WebSocket. После возвращения
+        // выполняется одна сверка и восстанавливается соединение.
+        synchronizeAllVisibleData();
         scheduleNextStatusBoundary();
         connectAdminWebSocket();
     });
@@ -201,20 +296,23 @@
     window.addEventListener("beforeunload", function stopAdminLiveUpdates() {
         stopped = true;
 
-        if (reconnectTimer !== null) {
-            window.clearTimeout(reconnectTimer);
-            reconnectTimer = null;
+        for (const timer of [
+            reconnectTimer,
+            slideReloadTimer,
+            screenReloadTimer,
+            userReloadTimer,
+            statusBoundaryTimer
+        ]) {
+            if (timer !== null) {
+                window.clearTimeout(timer);
+            }
         }
 
-        if (slideReloadTimer !== null) {
-            window.clearTimeout(slideReloadTimer);
-            slideReloadTimer = null;
-        }
-
-        if (statusBoundaryTimer !== null) {
-            window.clearTimeout(statusBoundaryTimer);
-            statusBoundaryTimer = null;
-        }
+        reconnectTimer = null;
+        slideReloadTimer = null;
+        screenReloadTimer = null;
+        userReloadTimer = null;
+        statusBoundaryTimer = null;
 
         if (websocket) {
             try {

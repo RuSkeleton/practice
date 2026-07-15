@@ -132,25 +132,37 @@ def _find_screen(db: Session, code: str) -> Optional[Screen]:
     return db.query(Screen).filter(Screen.code == code).one_or_none()
 
 
-def _mark_screen_online(db: Session, screen: Screen) -> None:
+def _mark_screen_online(db: Session, screen: Screen) -> bool:
+    """Помечает экран онлайн и сообщает, изменился ли сам статус."""
+    became_online = not bool(screen.is_online)
     screen.is_online = True
     screen.last_active = _utc_now()
     db.commit()
+    return became_online
 
 
-def _mark_screen_offline_by_code(screen_code: Optional[str]) -> None:
+async def _mark_screen_offline_by_code(screen_code: Optional[str]) -> None:
+    """Помечает экран офлайн и уведомляет админку только при переходе статуса."""
     if not screen_code:
         return
+
+    screen_id: Optional[int] = None
+    became_offline = False
 
     db = SessionLocal()
     try:
         screen = _find_screen(db, screen_code)
         if screen is not None:
+            screen_id = screen.id
+            became_offline = bool(screen.is_online)
             screen.is_online = False
             screen.last_active = _utc_now()
             db.commit()
     finally:
         db.close()
+
+    if became_offline and screen_id is not None:
+        await notify_screens_updated([screen_id], "screen_offline")
 
 
 def _authenticate_admin_access_token(token: str) -> Optional[tuple[int, str]]:
@@ -268,6 +280,12 @@ async def _handle_register(
                 ),
             }
         )
+
+        # Уведомляем при каждой успешной WebSocket-регистрации. REST-запросы
+        # экранного клиента тоже могут заранее выставить is_online=True,
+        # поэтому проверка только перехода False -> True пропустила бы событие.
+        await notify_screens_updated([screen.id], "screen_online")
+
         return screen.code
     finally:
         db.close()
@@ -277,13 +295,20 @@ async def _handle_pong(screen_code: Optional[str]) -> None:
     if not screen_code:
         return
 
+    screen_id: Optional[int] = None
+    became_online = False
+
     db = SessionLocal()
     try:
         screen = _find_screen(db, screen_code)
         if screen is not None and screen.is_connected:
-            _mark_screen_online(db, screen)
+            screen_id = screen.id
+            became_online = _mark_screen_online(db, screen)
     finally:
         db.close()
+
+    if became_online and screen_id is not None:
+        await notify_screens_updated([screen_id], "screen_online")
 
 
 @router.websocket("/ws/screens")
@@ -348,8 +373,11 @@ async def screens_websocket(websocket: WebSocket) -> None:
         except Exception:
             pass
     finally:
-        disconnected_code = manager.unregister(websocket) or registered_code
-        _mark_screen_offline_by_code(disconnected_code)
+        # Если соединение было заменено новым для того же экрана, register()
+        # уже удалил старый websocket из manager. В таком случае старое
+        # соединение не должно помечать новый активный экран как offline.
+        disconnected_code = manager.unregister(websocket)
+        await _mark_screen_offline_by_code(disconnected_code)
 
 
 @router.websocket("/ws/admin")
@@ -501,6 +529,36 @@ async def notify_slides_updated(
 
     # Админ-панель получает то же событие и перечитывает каталог через REST.
     await admin_manager.broadcast(message)
+
+
+async def notify_screens_updated(
+    screen_ids: list[int | str],
+    reason: str = "screen_updated",
+) -> None:
+    """Сообщает административным панелям, что каталог экранов изменился."""
+    await admin_manager.broadcast(
+        {
+            "type": "screens_updated",
+            "screen_ids": [str(screen_id) for screen_id in screen_ids],
+            "reason": reason,
+            "server_time": _iso_z(),
+        }
+    )
+
+
+async def notify_users_updated(
+    user_ids: list[int | str],
+    reason: str = "user_updated",
+) -> None:
+    """Сообщает административным панелям, что каталог пользователей изменился."""
+    await admin_manager.broadcast(
+        {
+            "type": "users_updated",
+            "user_ids": [str(user_id) for user_id in user_ids],
+            "reason": reason,
+            "server_time": _iso_z(),
+        }
+    )
 
 
 async def notify_screen_disabled(
