@@ -205,13 +205,20 @@ def _authenticate_admin_access_token(token: str) -> Optional[tuple[int, str]]:
         db.close()
 
 
-async def _send_register_failed(websocket: WebSocket, message: str) -> None:
+async def _send_register_failed(
+    websocket: WebSocket,
+    *,
+    error: str,
+    message: str,
+) -> None:
+    """Отправляет клиенту машиночитаемую причину отказа регистрации."""
     await websocket.send_json(
         {
             "type": "register_failed",
             "ok": False,
-            "error": "screen_auth_failed",
+            "error": error,
             "message": message,
+            "server_time": _iso_z(),
         }
     )
 
@@ -244,21 +251,24 @@ async def _handle_register(
         if screen is None:
             await _send_register_failed(
                 websocket,
-                "Не удалось подтвердить экран",
+                error="screen_credentials_invalid",
+                message="Токен экрана недействителен или был отозван",
             )
             return None
 
         if claimed_code and claimed_code != screen.code:
             await _send_register_failed(
                 websocket,
-                "Токен принадлежит другому экрану",
+                error="screen_credentials_invalid",
+                message="Токен принадлежит другому экрану",
             )
             return None
 
         if not screen.is_connected:
             await _send_register_failed(
                 websocket,
-                "Экран отключён администратором",
+                error="screen_suspended",
+                message="Показ временно приостановлен администратором",
             )
             return None
 
@@ -322,7 +332,8 @@ async def screens_websocket(websocket: WebSocket) -> None:
         if str(first_message.get("type") or "").lower() != "register":
             await _send_register_failed(
                 websocket,
-                "Первым сообщением должен быть register",
+                error="register_required",
+                message="Первым сообщением должен быть register",
             )
             await websocket.close(code=1008)
             return
@@ -561,15 +572,59 @@ async def notify_users_updated(
     )
 
 
-async def notify_screen_disabled(
+async def notify_screen_suspended(
     screen_code: str,
-    message: str = "Экран отключён администратором",
+    message: str = "Показ временно приостановлен администратором",
 ) -> None:
+    """Временно останавливает показ, не отзывая device token."""
     await manager.send_to_screen(
         screen_code,
         {
-            "type": "screen_disabled",
+            "type": "screen_suspended",
             "message": message,
             "server_time": _iso_z(),
         },
     )
+
+
+async def notify_screen_resumed(
+    screen_code: str,
+    message: str = "Показ снова разрешён администратором",
+) -> None:
+    """Ускоряет восстановление, если suspend-соединение ещё не закрыто клиентом."""
+    await manager.send_to_screen(
+        screen_code,
+        {
+            "type": "screen_resumed",
+            "message": message,
+            "server_time": _iso_z(),
+        },
+    )
+
+
+async def notify_screen_credentials_revoked(
+    screen_code: str,
+    message: str = "Привязка экрана отозвана администратором",
+) -> None:
+    """Сообщает клиенту, что сохранённый device token больше недействителен."""
+    await manager.send_to_screen(
+        screen_code,
+        {
+            "type": "screen_credentials_revoked",
+            "message": message,
+            "server_time": _iso_z(),
+        },
+    )
+
+
+async def notify_screen_disabled(
+    screen_code: str,
+    message: str = "Привязка экрана отозвана администратором",
+) -> None:
+    """Совместимая обёртка для старых импортов.
+
+    Обычное временное отключение должно использовать
+    :func:`notify_screen_suspended`. Эта функция означает окончательный отзыв
+    учётных данных устройства.
+    """
+    await notify_screen_credentials_revoked(screen_code, message)

@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1104,13 +1102,13 @@
                     '<span class="screen-name">' + escapeHtml(s.name || 'Без названия') + '</span>' +
                     '<span class="screen-code">' + escapeHtml(s.code) + '</span>' +
                     '<span class="screen-status ' + (s.is_online ? 'online' : 'offline') + '">' + (s.is_online ? 'Онлайн' : 'Оффлайн') + '</span>' +
-                    escapeHtml(s.is_connected ? ' Разрешён' : ' Отключён') +
+                    escapeHtml(s.is_connected ? ' Разрешён' : ' Приостановлен') +
                     '</div>' +
                     '<div class="screen-meta">' + escapeHtml(pairedText + (expiryText ? ' • ' + expiryText : '')) + '</div>' +
                     (s.location ? '<div class="screen-meta">' + escapeHtml(s.location) + '</div>' : '') +
                     '</div>' +
                     '<div class="screen-actions">' +
-                    (!s.is_connected ? '<button class="btn-connect" onclick="connectScreen(' + Number(s.id) + ')">Разрешить</button>' : '<button class="btn-disconnect" onclick="disconnectScreen(' + Number(s.id) + ')">Отключить</button>') +
+                    (!s.is_connected ? '<button class="btn-connect" onclick="connectScreen(' + Number(s.id) + ')">Разрешить</button>' : '<button class="btn-disconnect" onclick="disconnectScreen(' + Number(s.id) + ')">Приостановить</button>') +
                     '<button class="btn-secondary" onclick="resetScreenPairing(' + Number(s.id) + ')">Новый код</button>' +
                     '<button class="delete-btn" onclick="deleteScreen(' + Number(s.id) + ')">Удалить</button>' +
                     '</div></div>';
@@ -1119,45 +1117,158 @@
 
         async function connectScreen(id) {
             try {
-                await fetch(API_BASE + '/screens/' + id + '/connect', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                loadScreens();
-            } catch {}
-        }
+                const response = await fetch(
+                    API_BASE + '/screens/' + id + '/connect',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token
+                        }
+                    }
+                );
 
-        async function disconnectScreen(id) {
-            if (!confirm('Отключить этот экран?')) return;
-            try {
-                await fetch(API_BASE + '/screens/' + id + '/disconnect', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                loadScreens();
-            } catch {}
-        }
-
-        async function resetScreenPairing(id) {
-            if (!confirm('Отозвать старый токен экрана и выдать новый код привязки?')) return;
-            try {
-                const response = await fetch(API_BASE + '/screens/' + id + '/reset-pairing', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
                 if (response.status === 401) {
                     clearAuthAndRedirect();
                     return;
                 }
-                const data = await response.json();
+
+                const data = await response.json().catch(function() {
+                    return {};
+                });
+
                 if (!response.ok) {
-                    showScreenMessage('Ошибка: ' + (data.detail || 'Не удалось перевыпустить код'), 'error');
+                    showScreenMessage(
+                        'Ошибка: ' +
+                        (
+                            data.detail ||
+                            'Не удалось разрешить показ'
+                        ),
+                        'error'
+                    );
                     return;
                 }
-                showScreenMessage('Новый код: ' + data.code, 'success');
-                loadScreens();
-            } catch {
-                showScreenMessage('Ошибка подключения к серверу', 'error');
+
+                showScreenMessage(
+                    data.message ||
+                    'Показ разрешён. Экран подключится автоматически',
+                    'success'
+                );
+                await loadScreens();
+            } catch (_) {
+                showScreenMessage(
+                    'Ошибка подключения к серверу',
+                    'error'
+                );
+            }
+        }
+
+        async function disconnectScreen(id) {
+            const confirmed = confirm(
+                'Приостановить показ на этом экране?\n\n' +
+                'Привязка, device token и локальный кэш сохранятся. ' +
+                'После повторного разрешения новый код не понадобится.'
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(
+                    API_BASE + '/screens/' + id + '/disconnect',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token
+                        }
+                    }
+                );
+
+                if (response.status === 401) {
+                    clearAuthAndRedirect();
+                    return;
+                }
+
+                const data = await response.json().catch(function() {
+                    return {};
+                });
+
+                if (!response.ok) {
+                    showScreenMessage(
+                        'Ошибка: ' +
+                        (
+                            data.detail ||
+                            'Не удалось приостановить показ'
+                        ),
+                        'error'
+                    );
+                    return;
+                }
+
+                showScreenMessage(
+                    data.message ||
+                    'Показ приостановлен. Привязка сохранена',
+                    'success'
+                );
+                await loadScreens();
+            } catch (_) {
+                showScreenMessage(
+                    'Ошибка подключения к серверу',
+                    'error'
+                );
+            }
+        }
+
+        async function resetScreenPairing(id) {
+            const confirmed = confirm(
+                'Сбросить привязку экрана?\n\n' +
+                'Старый device token будет отозван, локальный клиент ' +
+                'потребует новый код. Используйте это только при ремонте, ' +
+                'утрате устройства или подозрении на компрометацию.'
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(
+                    API_BASE + '/screens/' + id + '/reset-pairing',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token
+                        }
+                    }
+                );
+
+                if (response.status === 401) {
+                    clearAuthAndRedirect();
+                    return;
+                }
+
+                const data = await response.json().catch(function() {
+                    return {};
+                });
+
+                if (!response.ok) {
+                    showScreenMessage(
+                        'Ошибка: ' +
+                        (
+                            data.detail ||
+                            'Не удалось перевыпустить код'
+                        ),
+                        'error'
+                    );
+                    return;
+                }
+
+                showScreenMessage(
+                    'Привязка сброшена. Новый код: ' + data.code,
+                    'success'
+                );
+                await loadScreens();
+            } catch (_) {
+                showScreenMessage(
+                    'Ошибка подключения к серверу',
+                    'error'
+                );
             }
         }
 
