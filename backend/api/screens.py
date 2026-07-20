@@ -17,7 +17,9 @@ from backend.auth import require_hr_or_admin
 from backend.config import config
 from backend.database import get_db
 from backend.routers.websocket import (
-    notify_screen_disabled,
+    notify_screen_credentials_revoked,
+    notify_screen_resumed,
+    notify_screen_suspended,
     notify_screens_updated,
 )
 from backend.screen_auth import (
@@ -144,7 +146,7 @@ def delete_screen(
     screen_code = screen.code
 
     background_tasks.add_task(
-        notify_screen_disabled,
+        notify_screen_credentials_revoked,
         screen_code,
         "Экран удалён администратором",
     )
@@ -171,12 +173,26 @@ def connect_screen(
     db.commit()
 
     if status_changed:
+        # Если старый WebSocket ещё не успел закрыться после suspend-события,
+        # экран сможет восстановиться немедленно. Основной гарантированный
+        # механизм восстановления — периодическая проверка /screen/me на клиенте.
+        background_tasks.add_task(
+            notify_screen_resumed,
+            screen.code,
+            "Показ снова разрешён администратором",
+        )
         background_tasks.add_task(
             notify_screens_updated,
             [screen.id],
             "screen_connected",
         )
-    return {"ok": True, "message": f"Экран {screen.code} разрешён"}
+    return {
+        "ok": True,
+        "message": (
+            f"Экран {screen.code} разрешён. "
+            "Он восстановит соединение автоматически"
+        ),
+    }
 
 
 @router.post("/screens/{screen_id}/disconnect")
@@ -192,9 +208,9 @@ def disconnect_screen(
     db.commit()
 
     background_tasks.add_task(
-        notify_screen_disabled,
+        notify_screen_suspended,
         screen.code,
-        "Экран отключён администратором",
+        "Показ временно приостановлен администратором",
     )
     if status_changed:
         background_tasks.add_task(
@@ -202,7 +218,13 @@ def disconnect_screen(
             [screen.id],
             "screen_disconnected",
         )
-    return {"ok": True}
+    return {
+        "ok": True,
+        "message": (
+            "Показ приостановлен. После повторного разрешения "
+            "экран подключится без нового кода"
+        ),
+    }
 
 
 @router.post(
@@ -222,16 +244,17 @@ def reset_screen_pairing(
     screen = _get_screen_or_404(db, screen_id)
     old_code = screen.code
 
-    background_tasks.add_task(
-        notify_screen_disabled,
-        old_code,
-        "Учётные данные экрана перевыпущены",
-    )
-
     try:
         code = rotate_screen_credentials(db, screen)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Это окончательный отзыв доверия к устройству, в отличие от disconnect.
+    background_tasks.add_task(
+        notify_screen_credentials_revoked,
+        old_code,
+        "Привязка экрана сброшена администратором",
+    )
 
     background_tasks.add_task(
         notify_screens_updated,

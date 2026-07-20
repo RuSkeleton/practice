@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -212,7 +211,7 @@
     <div id="codeScreen" class="code-screen">
         <div class="code-card">
             <h1>Код экрана</h1>
-            <p>Введите 3-значный код, выданный HR. После первой привязки экран сможет работать из локального кэша.</p>
+            <p>Введите 6-значный код, выданный HR. После первой привязки экран сможет работать из локального кэша.</p>
             <div class="code-row">
                 <input id="codeInput" maxlength="6" placeholder="000000" inputmode="numeric" autocomplete="off" autofocus />
                 <button id="codeSubmitBtn">Подключить</button>
@@ -337,7 +336,7 @@
         // GET  /api/screens/{code}/schedule?mode=full&days=3 response: full schedule snapshot
         // GET  /api/screens/{code}/schedule?mode=patch&from=...&to=...&base_version=... response: schedule patch
         // POST /api/slides/batch                            body: { ids: [] }, response: { slides: [], missing_ids: [] }
-        // WebSocket /ws/screens: register/registered/ping/pong/schedule_updated/slides_updated/screen_disabled.
+        // WebSocket /ws/screens: register/registered/ping/pong/schedule_updated/slides_updated/screen_suspended/screen_resumed/screen_credentials_revoked.
 
         // =========================================================
         // STATE
@@ -346,6 +345,7 @@
         const state = {
             screenCode: localStorage.getItem(CONFIG.SCREEN_CODE_KEY) || "",
             screenToken: localStorage.getItem(CONFIG.SCREEN_TOKEN_KEY) || "",
+            suspendedByAdmin: false,
             serverOnline: false,
             schedule: null,
             scheduleVersion: 0,
@@ -357,6 +357,7 @@
             currentRenderKey: "",
             websocket: null,
             reconnectTimer: null,
+            resumeTimer: null,
             refreshTimer: null,
             playerTimer: null,
             objectUrls: []
@@ -424,22 +425,52 @@
 
         async function startClientRuntime() {
             stopTimers();
+            stopConnection();
+
+            const authState = await tryAuthenticateStoredScreen();
+
+            if (authState === "authenticated") {
+                await startAuthenticatedRuntime("startup");
+                return;
+            }
+
+            if (authState === "suspended" || authState === "revoked") {
+                return;
+            }
+
+            // Сеть или сервер временно недоступны. В этом случае не считаем
+            // device token отозванным и продолжаем автономный показ из кэша.
             startPlayerLoop();
             startRefreshLoop();
 
-            const authenticated = await tryAuthenticateStoredScreen();
-            if (authenticated) {
-                connectWebSocket();
-                await loadFullSchedule({ silent: hasDisplayData(), reason: "startup" });
-            } else if (hasDisplayData()) {
+            if (hasDisplayData()) {
                 markServerOffline();
                 renderCurrentSlide(true);
-                scheduleWebSocketReconnect();
             } else {
                 markServerOffline();
-                showEmptyState("Нет данных", "Сервер недоступен, а локальный кэш пуст");
-                scheduleWebSocketReconnect();
+                showEmptyState(
+                    "Нет данных",
+                    "Сервер недоступен, а локальный кэш пуст"
+                );
             }
+
+            scheduleWebSocketReconnect();
+        }
+
+
+        async function startAuthenticatedRuntime(reason) {
+            stopResumeCheck();
+            state.suspendedByAdmin = false;
+            state.serverOnline = true;
+
+            startPlayerLoop();
+            startRefreshLoop();
+            connectWebSocket();
+
+            await loadFullSchedule({
+                silent: hasDisplayData(),
+                reason: reason || "authenticated"
+            });
         }
 
         function stopTimers() {
@@ -450,13 +481,41 @@
         }
 
         function stopConnection() {
-            if (state.reconnectTimer) window.clearTimeout(state.reconnectTimer);
-            state.reconnectTimer = null;
-            if (state.websocket) {
-                try { state.websocket.close(); } catch (_) {}
-            }
-            state.websocket = null;
+            stopWebSocketConnection();
+            stopResumeCheck();
         }
+
+
+        function stopWebSocketConnection() {
+            if (state.reconnectTimer) {
+                window.clearTimeout(state.reconnectTimer);
+            }
+            state.reconnectTimer = null;
+
+            const websocket = state.websocket;
+            state.websocket = null;
+
+            if (websocket) {
+                // Убираем обработчики до close, чтобы намеренное закрытие не
+                // запустило обычный reconnect поверх suspend-проверки.
+                websocket.onopen = null;
+                websocket.onmessage = null;
+                websocket.onerror = null;
+                websocket.onclose = null;
+
+                try {
+                    websocket.close();
+                } catch (_) {}
+            }
+        }
+
+
+        function stopResumeCheck() {
+            if (state.resumeTimer) {
+                window.clearTimeout(state.resumeTimer);
+            }
+            state.resumeTimer = null;
+        } 
 
         // =========================================================
         // ACTIVATION
@@ -493,17 +552,41 @@
         }
 
         async function tryAuthenticateStoredScreen() {
-            if (!state.screenCode || !state.screenToken) return false;
+            if (!state.screenCode || !state.screenToken) {
+                return "revoked";
+            }
+
             try {
                 const response = await requestJson(ENDPOINTS.screenMe());
                 syncClockFromPayload(response.data);
-                return true;
+
+                state.serverOnline = true;
+                state.suspendedByAdmin = false;
+                updateStatusUi();
+
+                return "authenticated";
             } catch (error) {
-                if (error.status === 401 || error.status === 403) {
-                    clearStoredScreenCode();
-                    showCodeScreen();
+                const failure = classifyScreenAuthFailure(error);
+
+                if (failure === "suspended") {
+                    handleScreenSuspended(
+                        error.message ||
+                        "Показ временно приостановлен администратором"
+                    );
+                    return "suspended";
                 }
-                return false;
+
+                if (failure === "revoked") {
+                    handleScreenCredentialsRevoked(
+                        error.message ||
+                        "Привязка экрана больше недействительна"
+                    );
+                    return "revoked";
+                }
+
+                // Сетевая ошибка, 5xx и другие временные сбои не должны
+                // уничтожать сохранённый device token.
+                return "offline";
             }
         }
 
@@ -543,6 +626,7 @@
             state.slidesById.clear();
             state.slidesSavedAt = "";
             state.currentRenderKey = "";
+            state.suspendedByAdmin = false;
             clearImageObjectUrls();
             updateStatusUi();
         }
@@ -552,22 +636,52 @@
         // =========================================================
 
         function connectWebSocket() {
-            if (!state.screenCode) return;
+            if (
+                !state.screenCode ||
+                !state.screenToken ||
+                state.suspendedByAdmin
+            ) {
+                return;
+            }
+
             if (state.reconnectTimer) {
                 window.clearTimeout(state.reconnectTimer);
                 state.reconnectTimer = null;
             }
-            if (state.websocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(state.websocket.readyState)) return;
+
+            if (
+                state.websocket &&
+                [WebSocket.OPEN, WebSocket.CONNECTING].includes(
+                    state.websocket.readyState
+                )
+            ) {
+                return;
+            }
+
+            let websocket;
 
             try {
-                state.websocket = new WebSocket(CONFIG.WS_URL);
+                websocket = new WebSocket(CONFIG.WS_URL);
+                state.websocket = websocket;
             } catch (_) {
                 markServerOffline();
                 scheduleWebSocketReconnect();
                 return;
             }
 
-            state.websocket.onopen = () => {
+            websocket.onopen = () => {
+                // Не регистрируем уже устаревшее соединение, если за время
+                // handshake экран успели приостановить.
+                if (
+                    websocket !== state.websocket ||
+                    state.suspendedByAdmin
+                ) {
+                    try {
+                        websocket.close();
+                    } catch (_) {}
+                    return;
+                }
+
                 state.serverOnline = true;
                 sendWebSocketMessage({
                     type: "register",
@@ -579,22 +693,42 @@
                 updateStatusUi();
             };
 
-            state.websocket.onmessage = event => handleWebSocketMessage(event.data);
-
-            state.websocket.onclose = () => {
-                markServerOffline();
-                scheduleWebSocketReconnect();
+            websocket.onmessage = event => {
+                if (websocket !== state.websocket) return;
+                handleWebSocketMessage(event.data);
             };
 
-            state.websocket.onerror = () => {
+            websocket.onclose = () => {
+                if (websocket !== state.websocket) return;
+
+                state.websocket = null;
                 markServerOffline();
-                try { state.websocket.close(); } catch (_) {}
+
+                if (state.suspendedByAdmin) {
+                    scheduleScreenResumeCheck();
+                } else {
+                    scheduleWebSocketReconnect();
+                }
+            };
+
+            websocket.onerror = () => {
+                if (websocket !== state.websocket) return;
+
+                markServerOffline();
+                try {
+                    websocket.close();
+                } catch (_) {}
             };
         }
 
         function handleWebSocketMessage(rawData) {
             let message = null;
-            try { message = JSON.parse(rawData); } catch (_) { return; }
+            try {
+                message = JSON.parse(rawData);
+            } catch (_) {
+                return;
+            }
+
             const type = String(message.type || "").toLowerCase();
 
             if (type === "ping") {
@@ -613,7 +747,22 @@
             }
 
             if (type === "register_failed") {
-                handleScreenDisabled(message.message || "Регистрация экрана отклонена сервером");
+                const errorCode = String(
+                    message.error || ""
+                ).toLowerCase();
+
+                if (errorCode === "screen_suspended") {
+                    handleScreenSuspended(
+                        message.message ||
+                        "Показ временно приостановлен администратором"
+                    );
+                    return;
+                }
+
+                handleScreenCredentialsRevoked(
+                    message.message ||
+                    "Сервер отклонил учётные данные экрана"
+                );
                 return;
             }
 
@@ -627,8 +776,29 @@
                 return;
             }
 
-            if (type === "screen_disabled") {
-                handleScreenDisabled(message.message || "Экран отключён администратором");
+            if (type === "screen_suspended") {
+                handleScreenSuspended(
+                    message.message ||
+                    "Показ временно приостановлен администратором"
+                );
+                return;
+            }
+
+            if (type === "screen_resumed") {
+                handleScreenResumed();
+                return;
+            }
+
+            if (
+                type === "screen_credentials_revoked" ||
+                // Обратная совместимость: старое screen_disabled теперь
+                // трактуется только как окончательный отзыв привязки.
+                type === "screen_disabled"
+            ) {
+                handleScreenCredentialsRevoked(
+                    message.message ||
+                    "Привязка экрана отозвана администратором"
+                );
             }
         }
 
@@ -690,19 +860,147 @@
         }
 
         function scheduleWebSocketReconnect() {
-            if (!state.screenCode || state.reconnectTimer) return;
+            if (
+                state.suspendedByAdmin ||
+                !state.screenCode ||
+                !state.screenToken ||
+                state.reconnectTimer
+            ) {
+                return;
+            }
+
             state.reconnectTimer = window.setTimeout(() => {
                 state.reconnectTimer = null;
                 connectWebSocket();
             }, CONFIG.RECONNECT_DELAY_MS);
         }
 
-        function handleScreenDisabled(message) {
+
+        function scheduleScreenResumeCheck() {
+            if (
+                !state.suspendedByAdmin ||
+                !state.screenCode ||
+                !state.screenToken ||
+                state.resumeTimer
+            ) {
+                return;
+            }
+
+            state.resumeTimer = window.setTimeout(async () => {
+                state.resumeTimer = null;
+
+                const authState = await tryAuthenticateStoredScreen();
+
+                if (authState === "authenticated") {
+                    await startAuthenticatedRuntime("screen_reenabled");
+                    return;
+                }
+
+                if (
+                    authState === "suspended" ||
+                    authState === "offline"
+                ) {
+                    scheduleScreenResumeCheck();
+                }
+            }, CONFIG.RECONNECT_DELAY_MS);
+        }
+
+
+        function handleScreenSuspended(message) {
+            if (!state.screenCode || !state.screenToken) {
+                return;
+            }
+
+            state.suspendedByAdmin = true;
+            state.serverOnline = false;
+
+            stopTimers();
+            stopWebSocketConnection();
+            enterPlayerMode();
+
+            showEmptyState(
+                "Показ приостановлен",
+                message ||
+                "Экран временно отключён администратором"
+            );
+            updateStatusUi();
+            scheduleScreenResumeCheck();
+        }
+
+
+        async function handleScreenResumed() {
+            if (
+                !state.suspendedByAdmin ||
+                !state.screenCode ||
+                !state.screenToken
+            ) {
+                return;
+            }
+
+            state.suspendedByAdmin = false;
+            await startAuthenticatedRuntime("screen_resumed_event");
+        }
+
+
+        function handleScreenCredentialsRevoked(message) {
+            state.suspendedByAdmin = false;
             markServerOffline();
             clearStoredScreenCode();
-            showEmptyState("Экран отключён", message || "Обратитесь к администратору или введите новый код");
+
+            showEmptyState(
+                "Требуется новая привязка",
+                message ||
+                "Обратитесь к администратору за новым кодом"
+            );
+
             window.setTimeout(showCodeScreen, 1500);
         }
+
+
+        function classifyScreenAuthFailure(error) {
+            const errorCode = String(
+                (error && error.code) || ""
+            ).toLowerCase();
+
+            if (
+                errorCode === "screen_suspended" ||
+                (error && error.status === 423)
+            ) {
+                return "suspended";
+            }
+
+            if (
+                errorCode === "screen_credentials_invalid" ||
+                (error && error.status === 401)
+            ) {
+                return "revoked";
+            }
+
+            return "offline";
+        }
+
+
+        function handleScreenRequestFailure(error) {
+            const failure = classifyScreenAuthFailure(error);
+
+            if (failure === "suspended") {
+                handleScreenSuspended(
+                    error.message ||
+                    "Показ временно приостановлен администратором"
+                );
+                return true;
+            }
+
+            if (failure === "revoked") {
+                handleScreenCredentialsRevoked(
+                    error.message ||
+                    "Привязка экрана больше недействительна"
+                );
+                return true;
+            }
+
+            return false;
+        } 
 
         // =========================================================
         // API CLIENT
@@ -715,25 +1013,73 @@
                 "Accept": "application/json",
                 ...(options.headers || {})
             };
+
             if (state.screenToken && path !== ENDPOINTS.activate()) {
                 requestHeaders["X-Screen-Token"] = state.screenToken;
             }
 
-            const response = await fetch(CONFIG.API_BASE + path, {
-                method: options.method || "GET",
-                headers: requestHeaders,
-                body: options.body,
-                cache: "no-store"
-            });
+            let response;
+
+            try {
+                response = await fetch(CONFIG.API_BASE + path, {
+                    method: options.method || "GET",
+                    headers: requestHeaders,
+                    body: options.body,
+                    cache: "no-store"
+                });
+            } catch (networkError) {
+                const error = new Error("Сервер недоступен");
+                error.status = 0;
+                error.code = "network_error";
+                error.cause = networkError;
+                throw error;
+            }
+
             const endedAt = Date.now();
             syncClockFromResponse(response, startedAt, endedAt);
 
             let data = null;
-            try { data = await response.json(); } catch (_) {}
+            try {
+                data = await response.json();
+            } catch (_) {}
 
             if (!response.ok) {
-                const error = new Error((data && (data.detail || data.message)) || "HTTP " + response.status);
+                const detail =
+                    data && data.detail !== undefined
+                        ? data.detail
+                        : null;
+
+                const detailObject =
+                    detail &&
+                    typeof detail === "object"
+                        ? detail
+                        : null;
+
+                const detailMessage =
+                    detailObject && detailObject.message
+                        ? detailObject.message
+                        : typeof detail === "string"
+                            ? detail
+                            : "";
+
+                const error = new Error(
+                    detailMessage ||
+                    (data && data.message) ||
+                    "HTTP " + response.status
+                );
+
                 error.status = response.status;
+                error.code = String(
+                    (
+                        detailObject &&
+                        detailObject.error
+                    ) ||
+                    (
+                        data &&
+                        data.error
+                    ) ||
+                    ""
+                );
                 error.data = data;
                 throw error;
             }
@@ -773,7 +1119,8 @@
         // =========================================================
 
         async function loadFullSchedule(options = {}) {
-            if (!state.screenCode) return;
+            if (!state.screenCode || state.suspendedByAdmin) return;
+
             try {
                 const schedule = await fetchFullSchedule();
                 state.lastFullSyncAt = new Date().toISOString();
@@ -784,38 +1131,73 @@
                 updateStatusUi();
                 renderCurrentSlide(true);
             } catch (error) {
+                if (handleScreenRequestFailure(error)) {
+                    return;
+                }
+
                 markServerOffline();
                 readCacheIntoState();
-                if (hasDisplayData()) renderCurrentSlide(true);
-                else if (!options.silent) showEmptyState("Нет данных", "Сервер недоступен, а локальный кэш пуст");
+
+                if (hasDisplayData()) {
+                    renderCurrentSlide(true);
+                } else if (!options.silent) {
+                    showEmptyState(
+                        "Нет данных",
+                        "Сервер недоступен, а локальный кэш пуст"
+                    );
+                }
             }
         }
 
         async function loadSchedulePatch(from, to, options = {}) {
-            if (!state.screenCode) return;
+            if (!state.screenCode || state.suspendedByAdmin) return;
+
             if (!state.schedule) {
-                await loadFullSchedule({ silent: options.silent, reason: "patch_without_base" });
+                await loadFullSchedule({
+                    silent: options.silent,
+                    reason: "patch_without_base"
+                });
                 return;
             }
 
             try {
-                const patch = await fetchSchedulePatch(from, to, state.scheduleVersion);
+                const patch = await fetchSchedulePatch(
+                    from,
+                    to,
+                    state.scheduleVersion
+                );
 
                 if (!canApplySchedulePatch(patch, options)) {
-                    await loadFullSchedule({ silent: true, reason: "patch_version_mismatch" });
+                    await loadFullSchedule({
+                        silent: true,
+                        reason: "patch_version_mismatch"
+                    });
                     return;
                 }
 
-                state.schedule = mergeSchedulePatch(state.schedule, patch);
-                state.scheduleVersion = safeInteger(state.schedule.schedule_version, state.scheduleVersion);
+                state.schedule = mergeSchedulePatch(
+                    state.schedule,
+                    patch
+                );
+                state.scheduleVersion = safeInteger(
+                    state.schedule.schedule_version,
+                    state.scheduleVersion
+                );
                 state.scheduleSavedAt = new Date().toISOString();
-                saveScheduleCache(state.schedule, state.scheduleSavedAt);
+                saveScheduleCache(
+                    state.schedule,
+                    state.scheduleSavedAt
+                );
 
                 await refreshSlidesForSchedule(state.schedule);
                 await persistCurrentSlidesAndImages();
                 updateStatusUi();
                 renderCurrentSlide(true);
             } catch (error) {
+                if (handleScreenRequestFailure(error)) {
+                    return;
+                }
+
                 markServerOffline();
             }
         }
@@ -970,20 +1352,34 @@
         }
 
         async function refreshSlidesByIds(ids, options = {}) {
+            if (state.suspendedByAdmin) return;
+
             const uniqueIds = [...new Set(
                 (ids || [])
                     .map(id => String(id))
                     .filter(id => id && id !== FALLBACK_SLIDE_ID)
             )];
+
             if (uniqueIds.length === 0) return;
 
             try {
                 const slides = await fetchSlidesByIds(uniqueIds);
                 mergeSlidesIntoState(slides);
-                if (options.persistAfter !== false) await persistCurrentSlidesAndImages();
+
+                if (options.persistAfter !== false) {
+                    await persistCurrentSlidesAndImages();
+                }
+
                 updateStatusUi();
-                if (options.renderAfter) renderCurrentSlide(true);
+
+                if (options.renderAfter) {
+                    renderCurrentSlide(true);
+                }
             } catch (error) {
+                if (handleScreenRequestFailure(error)) {
+                    return;
+                }
+
                 markServerOffline();
             }
         }
@@ -1665,6 +2061,7 @@
         function showCodeScreen() {
             stopTimers();
             stopConnection();
+            state.suspendedByAdmin = false;
             DOM.codeScreen.classList.remove("hidden");
             DOM.slideRoot.classList.add("hidden");
             DOM.statusBar.classList.add("hidden");
@@ -1675,7 +2072,10 @@
         function updateStatusUi() {
             DOM.statusIndicator.className = "";
 
-            if (state.serverOnline) {
+            if (state.suspendedByAdmin) {
+                DOM.statusIndicator.className = "offline";
+                DOM.statusText.textContent = "Приостановлен";
+            } else if (state.serverOnline) {
                 DOM.statusText.textContent = "Онлайн";
             } else if (hasDisplayData()) {
                 DOM.statusIndicator.className = "cached";
@@ -1685,10 +2085,20 @@
                 DOM.statusText.textContent = "Офлайн";
             }
 
-            const scheduleTime = state.scheduleSavedAt ? formatTime(state.scheduleSavedAt) : "пусто";
+            const scheduleTime = state.scheduleSavedAt
+                ? formatTime(state.scheduleSavedAt)
+                : "пусто";
             const slideCount = state.slidesById.size;
-            const versionText = state.scheduleVersion ? ", v" + state.scheduleVersion : "";
-            DOM.cacheInfo.textContent = "Кэш: " + scheduleTime + versionText + ", слайдов: " + slideCount;
+            const versionText = state.scheduleVersion
+                ? ", v" + state.scheduleVersion
+                : "";
+
+            DOM.cacheInfo.textContent =
+                "Кэш: " +
+                scheduleTime +
+                versionText +
+                ", слайдов: " +
+                slideCount;
         }
 
         function showLoading(title, text) {

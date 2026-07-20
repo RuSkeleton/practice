@@ -131,17 +131,34 @@ def require_screen(
     raw_token: str | None = Depends(_screen_token_header),
     db: Session = Depends(get_db),
 ) -> Screen:
-    """Dependency для REST API, доступного только привязанному экрану."""
+    """Dependency для REST API, доступного только привязанному экрану.
+
+    Временная приостановка и отзыв учётных данных — разные состояния:
+    * 423 ``screen_suspended``: токен правильный, но показ временно запрещён;
+    * 401 ``screen_credentials_invalid``: токен отсутствует, неверен или отозван.
+    """
     screen = get_screen_by_token(db, raw_token)
+
     if screen is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Не удалось подтвердить экран",
+            detail={
+                "ok": False,
+                "error": "screen_credentials_invalid",
+                "message": "Токен экрана недействителен или был отозван",
+            },
         )
+
     if not screen.is_connected:
+        # 423 Locked: сервер узнал устройство, но HR/admin временно запретил показ.
+        # Device token здесь намеренно не отзывается.
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Экран отключён администратором",
+            status_code=423,
+            detail={
+                "ok": False,
+                "error": "screen_suspended",
+                "message": "Показ временно приостановлен администратором",
+            },
         )
 
     screen.is_online = True
