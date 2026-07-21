@@ -1,4 +1,3 @@
-
 """Операции чтения и изменения сущностей через SQLAlchemy."""
 
 from __future__ import annotations
@@ -32,6 +31,15 @@ def get_slide(db: Session, slide_id: int):
     return db.query(models.Slide).filter(models.Slide.id == slide_id).first()
 
 
+def _apply_emergency_display_defaults(data: dict, *, is_emergency: bool) -> None:
+    """Экстренные слайды равноправны и не используют обычные настройки частоты."""
+    if not is_emergency:
+        return
+    data["duration_slots"] = 1
+    data["frequency_mode"] = 1
+    data["hard_interval"] = None
+
+
 def create_slide(
     db: Session,
     slide_data: schemas.SlideCreate,
@@ -40,6 +48,10 @@ def create_slide(
     data = slide_data.model_dump()
     data["start_date"] = _to_utc_naive(data["start_date"])
     data["end_date"] = _to_utc_naive(data["end_date"])
+    _apply_emergency_display_defaults(
+        data,
+        is_emergency=bool(data.get("is_emergency")),
+    )
 
     db_slide = models.Slide(
         **data,
@@ -68,6 +80,14 @@ def update_slide(
         update_data["start_date"] = _to_utc_naive(update_data["start_date"])
     if "end_date" in update_data:
         update_data["end_date"] = _to_utc_naive(update_data["end_date"])
+
+    final_is_emergency = bool(
+        update_data.get("is_emergency", db_slide.is_emergency)
+    )
+    _apply_emergency_display_defaults(
+        update_data,
+        is_emergency=final_is_emergency,
+    )
 
     # Для частичного PUT/PATCH Pydantic не видит итоговое состояние объекта,
     # поэтому проверяем период и hard_interval после объединения с данными БД.

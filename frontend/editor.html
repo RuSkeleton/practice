@@ -639,6 +639,8 @@
                 </label>
             </div>
 
+            <div class="field-hint hidden" id="displayEmergencyHint">Экстренные слайды показываются по кругу с одинаковой длительностью и не используют обычную настройку частоты.</div>
+
             <div class="field hidden" id="displayAlarmTypeGroup">
                 <label for="displayAlarmType">Тип тревоги</label>
                 <input id="displayAlarmType" maxlength="50" placeholder="Например: fire">
@@ -699,6 +701,7 @@
         displayHardInterval: document.getElementById('displayHardInterval'),
         displayIsActive: document.getElementById('displayIsActive'),
         displayIsEmergency: document.getElementById('displayIsEmergency'),
+        displayEmergencyHint: document.getElementById('displayEmergencyHint'),
         displayAlarmTypeGroup: document.getElementById('displayAlarmTypeGroup'),
         displayAlarmType: document.getElementById('displayAlarmType'),
         slideName: document.getElementById('slideName'),
@@ -1719,14 +1722,22 @@
     }
 
     function updateDisplaySettingsVisibility() {
+        const isEmergency = refs.displayIsEmergency.checked;
+        if (isEmergency) {
+            refs.displayDurationSlots.value = '1';
+            refs.displayFrequencyMode.value = '1';
+            refs.displayHardInterval.value = '5';
+        }
+
+        refs.displayDurationSlots.disabled = isEmergency;
+        refs.displayFrequencyMode.disabled = isEmergency;
+        refs.displayHardInterval.disabled = isEmergency;
         refs.displayHardIntervalGroup.classList.toggle(
             'hidden',
-            refs.displayFrequencyMode.value !== '4'
+            isEmergency || refs.displayFrequencyMode.value !== '4'
         );
-        refs.displayAlarmTypeGroup.classList.toggle(
-            'hidden',
-            !refs.displayIsEmergency.checked
-        );
+        refs.displayEmergencyHint.classList.toggle('hidden', !isEmergency);
+        refs.displayAlarmTypeGroup.classList.toggle('hidden', !isEmergency);
     }
 
     function openDisplaySettings() {
@@ -1796,9 +1807,9 @@
 
         state.slide.start_date = startDate;
         state.slide.end_date = endDate;
-        state.slide.duration_slots = durationSlots;
-        state.slide.frequency_mode = frequencyMode;
-        state.slide.hard_interval = frequencyMode === 4 ? hardInterval : null;
+        state.slide.duration_slots = isEmergency ? 1 : durationSlots;
+        state.slide.frequency_mode = isEmergency ? 1 : frequencyMode;
+        state.slide.hard_interval = isEmergency ? null : (frequencyMode === 4 ? hardInterval : null);
         state.slide.is_active = refs.displayIsActive.checked;
         state.slide.is_emergency = isEmergency;
         state.slide.alarm_type = isEmergency ? alarmType : null;

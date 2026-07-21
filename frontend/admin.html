@@ -609,6 +609,8 @@
                     </div>
                 </div>
 
+                <div class="field-hint hidden" id="displayEmergencyHint">Экстренные слайды показываются по кругу с одинаковой длительностью и не используют обычную настройку частоты.</div>
+
                 <div class="form-group hidden" id="displayAlarmTypeGroup">
                     <label for="displayAlarmType">Тип тревоги</label>
                     <input id="displayAlarmType" maxlength="50" placeholder="Например: fire" />
@@ -864,14 +866,25 @@
         const displayIsEmergency = document.getElementById('displayIsEmergency');
 
         function updateDisplaySettingsVisibility() {
+            const isEmergency = displayIsEmergency.checked;
+            const durationSlots = document.getElementById('displayDurationSlots');
+            const hardInterval = document.getElementById('displayHardInterval');
+
+            if (isEmergency) {
+                durationSlots.value = '1';
+                displayFrequencyMode.value = '1';
+                hardInterval.value = '5';
+            }
+
+            durationSlots.disabled = isEmergency;
+            displayFrequencyMode.disabled = isEmergency;
+            hardInterval.disabled = isEmergency;
             document.getElementById('displayHardIntervalGroup').classList.toggle(
                 'hidden',
-                displayFrequencyMode.value !== '4'
+                isEmergency || displayFrequencyMode.value !== '4'
             );
-            document.getElementById('displayAlarmTypeGroup').classList.toggle(
-                'hidden',
-                !displayIsEmergency.checked
-            );
+            document.getElementById('displayEmergencyHint').classList.toggle('hidden', !isEmergency);
+            document.getElementById('displayAlarmTypeGroup').classList.toggle('hidden', !isEmergency);
         }
 
         displayFrequencyMode.addEventListener('change', updateDisplaySettingsVisibility);
@@ -955,9 +968,9 @@
                 start_date: startDate,
                 end_date: endDate,
                 is_active: document.getElementById('displayIsActive').checked,
-                duration_slots: Number(document.getElementById('displayDurationSlots').value),
-                frequency_mode: frequencyMode,
-                hard_interval: frequencyMode === 4 ? hardInterval : null,
+                duration_slots: isEmergency ? 1 : Number(document.getElementById('displayDurationSlots').value),
+                frequency_mode: isEmergency ? 1 : frequencyMode,
+                hard_interval: isEmergency ? null : (frequencyMode === 4 ? hardInterval : null),
                 is_emergency: isEmergency,
                 alarm_type: isEmergency ? alarmType : null
             };

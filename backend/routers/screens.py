@@ -27,6 +27,7 @@ router = APIRouter()
 SCHEDULE_VERSION_KEY = "schedule_version"
 FALLBACK_SLIDE_ID = 0
 DEFAULT_WINDOW_SIZE_SECONDS = 3600
+EMERGENCY_SLOT_DURATION_SECONDS = 15
 
 _activation_limiter = SlidingWindowRateLimiter(
     max_attempts=config.SCREEN_ACTIVATION_MAX_FAILED_ATTEMPTS_PER_IP,
@@ -101,11 +102,48 @@ def _serialize_slide(slide: Slide) -> dict[str, Any]:
         "start_date": _iso_z(slide.start_date),
         "end_date": _iso_z(slide.end_date),
         "is_active": bool(slide.is_active),
+        "is_emergency": bool(slide.is_emergency),
+        "alarm_type": slide.alarm_type,
         "background": slide.background or {
             "type": "gradient",
             "value": "default",
         },
         "elements": slide.elements or [],
+    }
+
+
+def _get_emergency_slides(db: Session, now: datetime) -> list[Slide]:
+    """Возвращает включённые экстренные слайды, которые ещё не завершились.
+
+    Будущие слайды тоже попадают в ответ: экран заранее кэширует их и сам
+    включает в момент start_date, в том числе при временной потере сети.
+    """
+    return (
+        db.query(Slide)
+        .filter(
+            Slide.is_emergency.is_(True),
+            Slide.is_active.is_(True),
+            Slide.end_date > now,
+        )
+        .order_by(Slide.id.asc())
+        .all()
+    )
+
+
+def _serialize_emergency_queue(
+    slides: list[Slide],
+    now: datetime,
+) -> dict[str, Any]:
+    queue = [int(slide.id) for slide in slides]
+    active = any(
+        slide.start_date <= now < slide.end_date
+        for slide in slides
+    )
+    return {
+        "active": active,
+        "slot_duration": EMERGENCY_SLOT_DURATION_SECONDS,
+        # Каждый id присутствует ровно один раз: экстренные слайды равноправны.
+        "queue": queue,
     }
 
 
@@ -229,6 +267,7 @@ def get_screen_schedule(
             )
 
     windows = _get_windows(db, range_from, range_to)
+    emergency_slides = _get_emergency_slides(db, now)
     window_size_seconds = (
         int(windows[0].window_size_seconds)
         if windows and windows[0].window_size_seconds
@@ -241,6 +280,7 @@ def get_screen_schedule(
         "generated_at": _iso_z(now),
         "server_time": _iso_z(now),
         "window_size_seconds": window_size_seconds,
+        "emergency": _serialize_emergency_queue(emergency_slides, now),
         "schedule": [_serialize_window(window) for window in windows],
     }
 

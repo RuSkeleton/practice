@@ -38,7 +38,7 @@
         .code-card p { color: #9eb0ca; margin-bottom: 28px; }
         .code-row { display: flex; justify-content: center; gap: 12px; }
         #codeInput {
-            width: 132px;
+            width: 200px;
             padding: 15px 18px;
             border-radius: 14px;
             border: 2px solid #344a6f;
@@ -355,6 +355,7 @@
             slidesSavedAt: "",
             serverOffsetMs: Number(localStorage.getItem(CONFIG.SERVER_OFFSET_KEY) || 0),
             currentRenderKey: "",
+            currentPlaybackMode: "normal",
             websocket: null,
             reconnectTimer: null,
             resumeTimer: null,
@@ -1259,8 +1260,24 @@
                 server_time: patch.server_time || currentSchedule.server_time,
                 valid_from: currentSchedule.valid_from,
                 valid_to: currentSchedule.valid_to,
+                emergency: patch.emergency || currentSchedule.emergency,
                 schedule: mergedWindows
             }, "full");
+        }
+
+        function normalizeEmergencyQueue(payload) {
+            const emergency = payload && typeof payload === "object"
+                ? payload
+                : {};
+            const queue = Array.isArray(emergency.queue)
+                ? [...new Set(emergency.queue.map(id => String(id)).filter(id => id && id !== FALLBACK_SLIDE_ID))]
+                : [];
+
+            return {
+                active: Boolean(emergency.active),
+                slot_duration: Math.max(1, Number(emergency.slot_duration || 15)),
+                queue
+            };
         }
 
         function normalizeSchedule(payload, fallbackMode = "full") {
@@ -1291,14 +1308,21 @@
                 patch_from: payload.patch_from || payload.from || "",
                 patch_to: payload.patch_to || payload.to || "",
                 window_size_seconds: safeInteger(payload.window_size_seconds, 0),
+                emergency: normalizeEmergencyQueue(payload.emergency),
                 schedule: windows
             };
         }
 
         function extractSlideIdsFromSchedule(schedule) {
-            if (!schedule || !Array.isArray(schedule.schedule)) return [];
+            if (!schedule) return [];
             const ids = new Set();
-            for (const windowItem of schedule.schedule) {
+
+            for (const id of schedule.emergency && schedule.emergency.queue || []) {
+                const slideId = String(id);
+                if (slideId !== FALLBACK_SLIDE_ID) ids.add(slideId);
+            }
+
+            for (const windowItem of schedule.schedule || []) {
                 for (const id of windowItem.queue || []) {
                     const slideId = String(id);
                     if (slideId !== FALLBACK_SLIDE_ID) ids.add(slideId);
@@ -1423,7 +1447,7 @@
             const start = parseDateMs(slide.start_date || slide.startAt || slide.start_at);
             const end = parseDateMs(slide.end_date || slide.endAt || slide.end_at);
             if (start !== null && nowMs < start) return false;
-            if (end !== null && nowMs > end) return false;
+            if (end !== null && nowMs >= end) return false;
             return true;
         }
 
@@ -1643,7 +1667,9 @@
 
         function getDelayToNextPlayerTick() {
             const selection = selectCurrentScheduleSlot();
-            if (!selection || !selection.windowStartMs) return CONFIG.PLAYER_FALLBACK_DELAY_MS;
+            if (!selection || selection.windowStartMs === null || selection.windowStartMs === undefined) {
+                return CONFIG.PLAYER_FALLBACK_DELAY_MS;
+            }
             const nextSlotMs = selection.windowStartMs + ((selection.slotIndex + 1) * selection.slotDurationMs);
             const delay = nextSlotMs - getSyncedNowMs() + 25;
             return Math.max(CONFIG.PLAYER_MIN_DELAY_MS, Math.min(delay, CONFIG.REFRESH_INTERVAL_MS));
@@ -1658,14 +1684,17 @@
 
             const selection = selectCurrentScheduleSlot();
             if (!selection) {
+                state.currentPlaybackMode = "normal";
                 state.currentRenderKey = "";
                 showEmptyState("Нет текущего окна", "В расписании нет окна для текущего времени");
                 DOM.slideCounter.textContent = "0 / 0";
                 return;
             }
 
+            state.currentPlaybackMode = selection.mode || "normal";
+
             if (selection.slideId === FALLBACK_SLIDE_ID) {
-                const renderKey = FALLBACK_SLIDE_ID + ":" + selection.windowStartMs + ":" + selection.slotIndex;
+                const renderKey = state.currentPlaybackMode + ":" + FALLBACK_SLIDE_ID + ":" + selection.windowStartMs + ":" + selection.slotIndex;
                 DOM.slideCounter.textContent = (selection.queueIndex + 1) + " / " + selection.queueLength;
 
                 if (!force && state.currentRenderKey === renderKey) return;
@@ -1686,7 +1715,7 @@
                 return;
             }
 
-            const renderKey = selection.slideId + ":" + selection.windowStartMs + ":" + selection.slotIndex;
+            const renderKey = state.currentPlaybackMode + ":" + selection.slideId + ":" + selection.windowStartMs + ":" + selection.slotIndex;
             DOM.slideCounter.textContent = (selection.queueIndex + 1) + " / " + selection.queueLength;
             if (!force && state.currentRenderKey === renderKey) return;
             state.currentRenderKey = renderKey;
@@ -1696,8 +1725,40 @@
             updateStatusUi();
         }
 
+        function selectCurrentEmergencySlot(nowMs) {
+            const emergency = state.schedule && state.schedule.emergency;
+            const configuredQueue = emergency && Array.isArray(emergency.queue)
+                ? emergency.queue
+                : [];
+
+            const activeQueue = configuredQueue.filter(id => {
+                const slide = state.slidesById.get(String(id));
+                return slide && isSlideActive(slide, nowMs);
+            });
+            if (activeQueue.length === 0) return null;
+
+            const slotDurationMs = Math.max(1, Number(emergency.slot_duration || 15)) * 1000;
+            // Фиксированная точка отсчёта делает порядок одинаковым на всех экранах.
+            const windowStartMs = Date.UTC(2020, 0, 1);
+            const slotIndex = Math.floor((nowMs - windowStartMs) / slotDurationMs);
+            const queueIndex = positiveModulo(slotIndex, activeQueue.length);
+
+            return {
+                mode: "emergency",
+                slideId: String(activeQueue[queueIndex]),
+                slotIndex,
+                queueIndex,
+                queueLength: activeQueue.length,
+                windowStartMs,
+                slotDurationMs
+            };
+        }
+
         function selectCurrentScheduleSlot() {
             const nowMs = getSyncedNowMs();
+            const emergencySelection = selectCurrentEmergencySlot(nowMs);
+            if (emergencySelection) return emergencySelection;
+
             const windowItem = findCurrentScheduleWindow(nowMs);
             if (!windowItem) return null;
 
@@ -1715,6 +1776,7 @@
                 const slide = state.slidesById.get(slideId);
                 if (!slide || isSlideActive(slide, nowMs)) {
                     return {
+                        mode: "normal",
                         slideId,
                         slotIndex,
                         queueIndex,
@@ -2072,9 +2134,19 @@
         function updateStatusUi() {
             DOM.statusIndicator.className = "";
 
+            const emergencyActive = Boolean(
+                state.schedule &&
+                selectCurrentEmergencySlot(getSyncedNowMs())
+            );
+
             if (state.suspendedByAdmin) {
                 DOM.statusIndicator.className = "offline";
                 DOM.statusText.textContent = "Приостановлен";
+            } else if (emergencyActive && state.serverOnline) {
+                DOM.statusText.textContent = "Экстренный режим";
+            } else if (emergencyActive) {
+                DOM.statusIndicator.className = "cached";
+                DOM.statusText.textContent = "Экстренный режим: кэш";
             } else if (state.serverOnline) {
                 DOM.statusText.textContent = "Онлайн";
             } else if (hasDisplayData()) {
