@@ -208,75 +208,81 @@ def test_screen_schedule_response_contains_emergency_queue() -> None:
 
 
 
-def test_quick_activation_starts_prepared_emergency_template() -> None:
+def test_default_emergency_presets_are_created_once_and_inactive() -> None:
+    from backend.emergency_presets import (
+        DEFAULT_EMERGENCY_PRESETS,
+        ensure_default_emergency_presets,
+    )
+
+    db = _session()
+    try:
+        first = ensure_default_emergency_presets(db)
+        second = ensure_default_emergency_presets(db)
+
+        assert len(first) == len(DEFAULT_EMERGENCY_PRESETS)
+        assert len(second) == len(DEFAULT_EMERGENCY_PRESETS)
+        assert db.query(models.Slide).filter(models.Slide.is_emergency.is_(True)).count() == len(DEFAULT_EMERGENCY_PRESETS)
+        assert all(slide.is_active is False for slide in second)
+        assert all(slide.template_key for slide in second)
+    finally:
+        db.close()
+
+
+def test_inactive_emergency_presets_are_hidden_from_general_slide_list() -> None:
+    from backend.emergency_presets import ensure_default_emergency_presets
+
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     db = _session()
     try:
-        template = crud.create_slide(
-            db,
-            _slide_payload(
-                now,
-                name="Пожарная тревога",
-                is_active=False,
-                is_emergency=True,
-                alarm_type="fire",
-                start_date=now - timedelta(days=2),
-                end_date=now - timedelta(days=1),
-            ),
-        )
-        original_revision = template.revision
+        presets = ensure_default_emergency_presets(db)
+        regular = crud.create_slide(db, _slide_payload(now, name="Обычный"))
 
-        activated = crud.activate_emergency_slide(db, template.id, user_id=12)
+        visible = crud.get_admin_slides(db)
+
+        assert [slide.id for slide in visible] == [regular.id]
+        assert all(preset.id not in {slide.id for slide in visible} for preset in presets)
+    finally:
+        db.close()
+
+
+def test_active_emergency_preset_is_first_and_disappears_after_deactivation() -> None:
+    from backend.emergency_presets import (
+        ensure_default_emergency_presets,
+        set_emergency_preset_active,
+    )
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db = _session()
+    try:
+        preset = ensure_default_emergency_presets(db)[0]
+        regular = crud.create_slide(db, _slide_payload(now, name="Обычный"))
+
+        activated = set_emergency_preset_active(
+            db,
+            preset.id,
+            is_active=True,
+            user_id=None,
+        )
+        visible = crud.get_admin_slides(db)
 
         assert activated is not None
-        assert activated.is_active is True
-        assert activated.is_emergency is True
-        assert activated.start_date <= datetime.now(timezone.utc).replace(tzinfo=None)
-        assert activated.end_date > activated.start_date + timedelta(days=3000)
-        assert activated.duration_slots == 1
-        assert activated.frequency_mode == 1
-        assert activated.hard_interval is None
-        assert activated.revision == original_revision + 1
-        assert activated.updated_by == 12
-    finally:
-        db.close()
+        assert [slide.id for slide in visible] == [preset.id, regular.id]
 
-
-def test_quick_deactivation_keeps_emergency_template_for_reuse() -> None:
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    db = _session()
-    try:
-        template = crud.create_slide(
+        set_emergency_preset_active(
             db,
-            _slide_payload(
-                now,
-                is_emergency=True,
-                alarm_type="smoke",
-            ),
+            preset.id,
+            is_active=False,
+            user_id=None,
         )
-
-        stopped = crud.deactivate_emergency_slide(db, template.id, user_id=4)
-
-        assert stopped is not None
-        assert stopped.is_active is False
-        assert stopped.is_emergency is True
-        assert stopped.alarm_type == "smoke"
-        assert stopped.updated_by == 4
+        assert [slide.id for slide in crud.get_admin_slides(db)] == [regular.id]
     finally:
         db.close()
 
 
-def test_quick_activation_rejects_normal_slide() -> None:
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    db = _session()
-    try:
-        slide = crud.create_slide(db, _slide_payload(now, is_emergency=False))
+def test_emergency_preset_api_routes_are_registered() -> None:
+    from backend.main import app
 
-        try:
-            crud.activate_emergency_slide(db, slide.id)
-        except ValueError as exc:
-            assert "только для аварийного" in str(exc)
-        else:
-            raise AssertionError("Обычный слайд не должен запускаться через аварийную панель")
-    finally:
-        db.close()
+    paths = app.openapi().get("paths", {})
+    assert "/api/emergency-presets" in paths
+    assert "/api/emergency-presets/{slide_id}/activate" in paths
+    assert "/api/emergency-presets/{slide_id}/deactivate" in paths

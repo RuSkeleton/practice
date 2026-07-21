@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import func
@@ -25,6 +25,33 @@ def _to_utc_naive(value):
 
 def get_all_slides(db: Session):
     return db.query(models.Slide).order_by(models.Slide.created_at.desc()).all()
+
+
+def get_admin_slides(db: Session):
+    """Обычный каталог плюс только фактически активные аварийные слайды.
+
+    Выключенные аварийные пресеты скрыты из общего списка и доступны через
+    отдельное меню быстрого запуска.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    active_emergency = (
+        db.query(models.Slide)
+        .filter(
+            models.Slide.is_emergency.is_(True),
+            models.Slide.is_active.is_(True),
+            models.Slide.start_date <= now,
+            models.Slide.end_date > now,
+        )
+        .order_by(models.Slide.id.asc())
+        .all()
+    )
+    regular = (
+        db.query(models.Slide)
+        .filter(models.Slide.is_emergency.is_(False))
+        .order_by(models.Slide.created_at.desc())
+        .all()
+    )
+    return [*active_emergency, *regular]
 
 
 def get_slide(db: Session, slide_id: int):
@@ -122,59 +149,6 @@ def delete_slide(db: Session, slide_id: int) -> bool:
     db.delete(db_slide)
     db.commit()
     return True
-
-
-def activate_emergency_slide(
-    db: Session,
-    slide_id: int,
-    user_id: Optional[int] = None,
-):
-    """Немедленно запускает заранее подготовленный аварийный шаблон.
-
-    Конечная дата остаётся технически обязательной по контракту слайда, поэтому
-    быстрый запуск продлевает её на десять лет. Фактически показ прекращается
-    вручную через deactivate_emergency_slide.
-    """
-    db_slide = get_slide(db, slide_id)
-    if db_slide is None:
-        return None
-    if not db_slide.is_emergency:
-        raise ValueError("Быстрый запуск доступен только для аварийного слайда")
-
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    db_slide.start_date = now
-    db_slide.end_date = now + timedelta(days=3650)
-    db_slide.is_active = True
-    db_slide.duration_slots = 1
-    db_slide.frequency_mode = 1
-    db_slide.hard_interval = None
-    db_slide.revision += 1
-    db_slide.updated_by = user_id
-
-    db.commit()
-    db.refresh(db_slide)
-    return db_slide
-
-
-def deactivate_emergency_slide(
-    db: Session,
-    slide_id: int,
-    user_id: Optional[int] = None,
-):
-    """Останавливает аварийный шаблон, не удаляя его из каталога."""
-    db_slide = get_slide(db, slide_id)
-    if db_slide is None:
-        return None
-    if not db_slide.is_emergency:
-        raise ValueError("Остановка через аварийную панель доступна только для аварийного слайда")
-
-    db_slide.is_active = False
-    db_slide.revision += 1
-    db_slide.updated_by = user_id
-
-    db.commit()
-    db.refresh(db_slide)
-    return db_slide
 
 
 # ---------------------------------------------------------------------------

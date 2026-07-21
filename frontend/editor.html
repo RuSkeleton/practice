@@ -633,8 +633,8 @@
                     <input id="displayIsActive" type="checkbox">
                     <span>Разрешить показ слайда</span>
                 </label>
-                <label class="modal-checkbox" for="displayIsEmergency">
-                    <input id="displayIsEmergency" type="checkbox">
+                <label class="modal-checkbox hidden" for="displayIsEmergency">
+                    <input id="displayIsEmergency" type="checkbox" disabled>
                     <span>Экстренный слайд</span>
                 </label>
             </div>
@@ -669,20 +669,7 @@
     const CANVAS_HEIGHT = 1080;
     const IMAGE_ACCEPTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     const DATA_ACCEPTED_EXTENSIONS = ['csv', 'json'];
-    const editorParams = new URLSearchParams(location.search);
-    const slideId = editorParams.get('id');
-    const returnToEmergencyMenu = editorParams.get('return') === 'emergency';
-    const emergencyPresetRequested = !slideId && editorParams.get('emergency') === '1';
-
-    const EMERGENCY_PRESET_LABELS = {
-        fire: 'Пожарная тревога',
-        smoke: 'Задымление',
-        uav_attack: 'Опасность атаки БПЛА',
-        missile_alert: 'Ракетная опасность',
-        evacuation: 'Эвакуация',
-        chemical_hazard: 'Химическая опасность',
-        custom: 'Новый аварийный шаблон'
-    };
+    const slideId = new URLSearchParams(location.search).get('id');
 
     const state = {
         slide: createEmptySlide(),
@@ -766,72 +753,23 @@
         chartJsonDateTo: document.getElementById('chartJsonDateTo')
     };
 
-    function createEmergencyStarterElements(title) {
-        return [
-            {
-                id: 'emergency-label',
-                type: 'badge',
-                role: 'eyebrow',
-                value: 'ВНИМАНИЕ',
-                layout: {
-                    x: 710, y: 135, width: 500, height: 90, zIndex: 1,
-                    fontSize: 42, fontWeight: 800, fontStyle: 'normal',
-                    color: '#ffffff', align: 'center'
-                }
-            },
-            {
-                id: 'emergency-title',
-                type: 'text',
-                role: 'title',
-                value: title,
-                layout: {
-                    x: 160, y: 300, width: 1600, height: 250, zIndex: 2,
-                    fontSize: 112, fontWeight: 800, fontStyle: 'normal',
-                    color: '#ffffff', align: 'center'
-                }
-            },
-            {
-                id: 'emergency-instruction',
-                type: 'text',
-                role: 'body',
-                value: 'Сохраняйте спокойствие и следуйте указаниям ответственных лиц',
-                layout: {
-                    x: 260, y: 650, width: 1400, height: 180, zIndex: 3,
-                    fontSize: 54, fontWeight: 600, fontStyle: 'normal',
-                    color: '#ffffff', align: 'center'
-                }
-            }
-        ];
-    }
-
     function createEmptySlide() {
         const start = new Date();
         const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const alarmType = emergencyPresetRequested
-            ? (editorParams.get('alarm_type') || 'custom')
-            : null;
-        const presetLabel = EMERGENCY_PRESET_LABELS[alarmType] || 'Аварийное сообщение';
-        const requestedName = (editorParams.get('name') || '').trim();
-        const name = emergencyPresetRequested
-            ? (requestedName || presetLabel)
-            : 'Новый слайд';
-
         return {
-            name,
+            name: 'Новый слайд',
             template_key: null,
             kind: 'announcement',
             start_date: start.toISOString(),
             end_date: end.toISOString(),
-            is_active: emergencyPresetRequested ? false : true,
+            is_active: true,
             duration_slots: 1,
             frequency_mode: 1,
             hard_interval: null,
-            is_emergency: emergencyPresetRequested,
-            alarm_type: alarmType,
-            background: emergencyPresetRequested
-                ? { type: 'gradient', value: 'urgent' }
-                : { type: 'color', value: '#07111f' },
-            elements: emergencyPresetRequested ? createEmergencyStarterElements(presetLabel) : []
+            is_emergency: false,
+            alarm_type: null,
+            background: { type: 'color', value: '#07111f' },
+            elements: []
         };
     }
 
@@ -877,7 +815,10 @@
             state.slide = await apiFetch('/slides/' + encodeURIComponent(slideId));
             state.slide.background ||= { type: 'color', value: '#07111f' };
             state.slide.elements ||= [];
-            refs.pageTitle.textContent = 'Редактирование: ' + state.slide.name;
+            refs.pageTitle.textContent = state.slide.is_emergency
+                ? 'Аварийный пресет: ' + state.slide.name
+                : 'Редактирование: ' + state.slide.name;
+            refs.displaySettingsButton.classList.toggle('hidden', Boolean(state.slide.is_emergency));
             syncSlideControls();
             render();
             setStatus('Загружено');
@@ -1738,10 +1679,7 @@
             setStatus('Сохранено');
             syncSlideControls();
             render();
-            if (!slideId && saved?.id) {
-                const returnSuffix = returnToEmergencyMenu ? '&return=emergency' : '';
-                location.replace('/editor.html?id=' + saved.id + returnSuffix);
-            }
+            if (!slideId && saved?.id) location.replace('/editor.html?id=' + saved.id);
         } catch (error) {
             setStatus(error.message, true);
         } finally {
@@ -2026,9 +1964,7 @@
     refs.displaySettingsModal.addEventListener('click', event => {
         if (event.target === refs.displaySettingsModal) closeDisplaySettings();
     });
-    document.getElementById('backButton').addEventListener('click', () => {
-        location.href = returnToEmergencyMenu ? '/admin.html?emergency=1' : '/admin.html';
-    });
+    document.getElementById('backButton').addEventListener('click', () => { location.href = '/admin.html'; });
     window.addEventListener('resize', updateScale);
     window.addEventListener('beforeunload', () => {
         for (const key of [...state.pendingImages.keys()]) clearPendingImage(key);

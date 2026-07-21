@@ -10,10 +10,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend import crud, models, schemas
+from backend.emergency_presets import (
+    get_emergency_presets,
+    set_emergency_preset_active,
+)
 from backend.auth import require_hr_or_admin
 from backend.database import SessionLocal, get_db
 from backend.routers.websocket import notify_schedule_updated, notify_slides_updated
-from backend.schedule_generator import ScheduleGenerator
+from backend.schedule_generator import SCHEDULE_VERSION_KEY, ScheduleGenerator
 
 
 router = APIRouter(dependencies=[Depends(require_hr_or_admin)])
@@ -30,6 +34,12 @@ def create_slide(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_hr_or_admin),
 ):
+    if slide.is_emergency:
+        raise HTTPException(
+            status_code=400,
+            detail="Аварийные слайды создаются и запускаются через меню аварийных пресетов",
+        )
+
     db_slide = crud.create_slide(db, slide, current_user.id)
     background_tasks.add_task(regenerate_schedule_and_notify)
     background_tasks.add_task(
@@ -44,8 +54,8 @@ def create_slide(
 def get_all_slides(
     db: Session = Depends(get_db),
 ):
-    """Внутренний каталог слайдов доступен только HR/admin."""
-    return crud.get_all_slides(db)
+    """Обычные слайды и активные аварийные слайды для верхней части списка."""
+    return crud.get_admin_slides(db)
 
 
 @router.get("/slides/{slide_id}", response_model=schemas.SlideOut)
@@ -67,6 +77,31 @@ def update_slide(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_hr_or_admin),
 ):
+    existing = crud.get_slide(db, slide_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Слайд не найден")
+
+    if existing.is_emergency:
+        # Редактор меняет только содержимое пресета. Состояние аварийного режима,
+        # тип тревоги и период управляются отдельными быстрыми действиями.
+        slide = slide.model_copy(
+            update={
+                "is_emergency": True,
+                "alarm_type": existing.alarm_type,
+                "is_active": existing.is_active,
+                "start_date": existing.start_date,
+                "end_date": existing.end_date,
+                "duration_slots": 1,
+                "frequency_mode": 1,
+                "hard_interval": None,
+            }
+        )
+    elif slide.is_emergency is True:
+        raise HTTPException(
+            status_code=400,
+            detail="Обычный слайд нельзя превратить в аварийный; используйте аварийные пресеты",
+        )
+
     try:
         db_slide = crud.update_slide(db, slide_id, slide, current_user.id)
     except ValueError as exc:
@@ -84,58 +119,68 @@ def update_slide(
     return db_slide
 
 
+@router.get("/emergency-presets", response_model=List[schemas.SlideOut])
+def list_emergency_presets(
+    db: Session = Depends(get_db),
+):
+    """Отдельный каталог встроенных аварийных пресетов."""
+    return get_emergency_presets(db)
+
+
 @router.post(
-    "/slides/{slide_id}/emergency/activate",
+    "/emergency-presets/{slide_id}/activate",
     response_model=schemas.SlideOut,
 )
-def activate_emergency_slide(
+def activate_emergency_preset(
     slide_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_hr_or_admin),
 ):
-    try:
-        db_slide = crud.activate_emergency_slide(db, slide_id, current_user.id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    slide = set_emergency_preset_active(
+        db,
+        slide_id,
+        is_active=True,
+        user_id=current_user.id,
+    )
+    if slide is None:
+        raise HTTPException(status_code=404, detail="Аварийный пресет не найден")
 
-    if db_slide is None:
-        raise HTTPException(status_code=404, detail="Слайд не найден")
-
-    background_tasks.add_task(regenerate_schedule_and_notify)
+    background_tasks.add_task(notify_emergency_changed, "emergency_activated")
     background_tasks.add_task(
         notify_slides_updated,
-        [db_slide.id],
-        "emergency_slide_activated",
+        [slide.id],
+        "emergency_activated",
     )
-    return db_slide
+    return slide
 
 
 @router.post(
-    "/slides/{slide_id}/emergency/deactivate",
+    "/emergency-presets/{slide_id}/deactivate",
     response_model=schemas.SlideOut,
 )
-def deactivate_emergency_slide(
+def deactivate_emergency_preset(
     slide_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_hr_or_admin),
 ):
-    try:
-        db_slide = crud.deactivate_emergency_slide(db, slide_id, current_user.id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    slide = set_emergency_preset_active(
+        db,
+        slide_id,
+        is_active=False,
+        user_id=current_user.id,
+    )
+    if slide is None:
+        raise HTTPException(status_code=404, detail="Аварийный пресет не найден")
 
-    if db_slide is None:
-        raise HTTPException(status_code=404, detail="Слайд не найден")
-
-    background_tasks.add_task(regenerate_schedule_and_notify)
+    background_tasks.add_task(notify_emergency_changed, "emergency_deactivated")
     background_tasks.add_task(
         notify_slides_updated,
-        [db_slide.id],
-        "emergency_slide_deactivated",
+        [slide.id],
+        "emergency_deactivated",
     )
-    return db_slide
+    return slide
 
 
 @router.delete("/slides/{slide_id}")
@@ -145,6 +190,15 @@ def delete_slide(
     db: Session = Depends(get_db),
     _: models.User = Depends(require_hr_or_admin),
 ):
+    db_slide = crud.get_slide(db, slide_id)
+    if db_slide is None:
+        raise HTTPException(status_code=404, detail="Слайд не найден")
+    if db_slide.is_emergency:
+        raise HTTPException(
+            status_code=400,
+            detail="Встроенный аварийный пресет нельзя удалить; его можно отредактировать или отключить",
+        )
+
     if not crud.delete_slide(db, slide_id):
         raise HTTPException(status_code=404, detail="Слайд не найден")
 
@@ -155,6 +209,30 @@ def delete_slide(
         "slide_deleted",
     )
     return {"ok": True}
+
+
+async def notify_emergency_changed(reason: str) -> None:
+    """Немедленно сообщает экранам, что аварийная очередь изменилась."""
+    db = SessionLocal()
+    try:
+        setting = (
+            db.query(models.SystemSetting)
+            .filter(models.SystemSetting.setting_key == SCHEDULE_VERSION_KEY)
+            .one_or_none()
+        )
+        schedule_version = int(setting.int_value or 0) if setting else 0
+    finally:
+        db.close()
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    await notify_schedule_updated(
+        mode="full",
+        schedule_version=schedule_version,
+        previous_schedule_version=max(0, schedule_version - 1),
+        from_=now.isoformat() + "Z",
+        to=(now + timedelta(days=3)).isoformat() + "Z",
+        reason=reason,
+    )
 
 
 async def regenerate_schedule_and_notify() -> None:

@@ -15,6 +15,7 @@ from backend.api.screens import router as screens_admin_router
 from backend.api.slides import router as slides_router
 from backend.config import BASE_DIR, config
 from backend.database import SessionLocal
+from backend.emergency_presets import ensure_default_emergency_presets
 from backend.routers import screens as screen_client_router
 from backend.routers import uploads as uploads_router
 from backend.routers import websocket as screens_websocket_router
@@ -43,6 +44,7 @@ async def lifespan(_: FastAPI):
     db = SessionLocal()
     try:
         bootstrap_auth(db)
+        ensure_default_emergency_presets(db)
     finally:
         db.close()
 
