@@ -154,6 +154,165 @@
             padding: 11px 22px;
             white-space: nowrap;
         }
+        .section-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            min-width: 230px;
+        }
+        .btn-emergency {
+            width: 100%;
+            padding: 12px 20px;
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            background: #b4232f;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 750;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(180, 35, 47, 0.22);
+        }
+        .btn-emergency:hover {
+            background: #d12d3b;
+        }
+        .emergency-modal-card {
+            width: min(860px, 100%);
+            max-height: min(820px, calc(100vh - 40px));
+            overflow-y: auto;
+            border-color: #71303a;
+        }
+        .emergency-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+        }
+        .emergency-modal-header h2 {
+            color: #ff7f86;
+            margin-bottom: 6px;
+        }
+        .modal-close-btn {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+            border: 1px solid #3a4965;
+            border-radius: 8px;
+            background: #0f1a2e;
+            color: #dfe8f8;
+            font-size: 22px;
+            cursor: pointer;
+        }
+        .emergency-explanation {
+            margin-bottom: 16px;
+            color: #9cacc6;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .emergency-active-summary {
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            border: 1px solid #7f2632;
+            border-radius: 9px;
+            background: #381821;
+            color: #ffc3c7;
+            font-weight: 650;
+        }
+        .emergency-template-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .emergency-template-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 178px;
+            padding: 16px;
+            border: 1px solid #32405c;
+            border-radius: 10px;
+            background: #0f1a2e;
+        }
+        .emergency-template-card.active {
+            border-color: #e14350;
+            box-shadow: inset 0 0 0 1px rgba(225, 67, 80, 0.35);
+        }
+        .emergency-template-card.missing {
+            border-style: dashed;
+            opacity: 0.9;
+        }
+        .emergency-template-type {
+            margin-bottom: 5px;
+            color: #ff8e95;
+            font-size: 12px;
+            font-weight: 750;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .emergency-template-title {
+            color: #f4f7ff;
+            font-size: 17px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        .emergency-template-status {
+            margin-top: 7px;
+            color: #8192ae;
+            font-size: 13px;
+        }
+        .emergency-template-card.active .emergency-template-status {
+            color: #ff9ea5;
+            font-weight: 700;
+        }
+        .emergency-template-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: auto;
+            padding-top: 15px;
+        }
+        .emergency-template-actions button {
+            padding: 8px 11px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 650;
+        }
+        .emergency-launch-btn {
+            flex: 1 1 120px;
+            border: 1px solid #f15b66;
+            background: #b4232f;
+            color: #fff;
+        }
+        .emergency-launch-btn:hover { background: #d12d3b; }
+        .emergency-stop-btn {
+            flex: 1 1 120px;
+            border: 1px solid #d49a36;
+            background: #684815;
+            color: #ffe3a3;
+        }
+        .emergency-stop-btn:hover { background: #80591a; }
+        .emergency-edit-btn {
+            border: 1px solid #3577bd;
+            background: #24558d;
+            color: #dcecff;
+        }
+        .emergency-delete-btn {
+            border: 1px solid #7b3f48;
+            background: transparent;
+            color: #ff9ba2;
+        }
+        .emergency-create-btn {
+            width: 100%;
+            border: 1px solid #6c7890;
+            background: #26334b;
+            color: #e5ecf8;
+        }
+        .emergency-footer-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 18px;
+        }
         .section-header {
             display: flex;
             justify-content: space-between;
@@ -426,6 +585,16 @@
             .btn-inline {
                 width: 100%;
             }
+            .section-actions {
+                width: 100%;
+                min-width: 0;
+            }
+            .emergency-template-grid {
+                grid-template-columns: 1fr;
+            }
+            .emergency-footer-actions {
+                flex-direction: column;
+            }
             .slide-item {
                 flex-direction: column;
             }
@@ -463,7 +632,10 @@
                             а сроки, частота и состояние показа меняются без удаления слайда.
                         </p>
                     </div>
-                    <button type="button" id="createSlideBtn" class="btn-primary btn-inline">Создать слайд</button>
+                    <div class="section-actions">
+                        <button type="button" id="createSlideBtn" class="btn-primary btn-inline">Создать слайд</button>
+                        <button type="button" id="openEmergencySlidesBtn" class="btn-emergency">Создать аварийный слайд</button>
+                    </div>
                 </div>
                 <div id="slidesMessage" class="form-message"></div>
                 <div id="slidesList"><p class="loading">Загрузка...</p></div>
@@ -545,6 +717,28 @@
             <div class="card">
                 <h2>Список пользователей</h2>
                 <div id="usersList"><p class="loading">Загрузка...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="emergencySlidesModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="emergencySlidesTitle">
+        <div class="modal-card emergency-modal-card">
+            <div class="emergency-modal-header">
+                <div>
+                    <h2 id="emergencySlidesTitle">Аварийные слайды</h2>
+                    <p class="emergency-explanation">
+                        Нажатие «Запустить» немедленно включает выбранный шаблон на всех экранах.
+                        Если запущено несколько шаблонов, они показываются по кругу на равных условиях.
+                    </p>
+                </div>
+                <button type="button" id="emergencySlidesCloseBtn" class="modal-close-btn" aria-label="Закрыть">×</button>
+            </div>
+            <div id="emergencyActiveSummary" class="emergency-active-summary hidden"></div>
+            <div id="emergencySlidesMessage" class="form-message"></div>
+            <div id="emergencyTemplatesGrid" class="emergency-template-grid"></div>
+            <div class="emergency-footer-actions">
+                <button type="button" id="createCustomEmergencyTemplateBtn" class="btn-secondary">Создать свой шаблон</button>
+                <button type="button" id="emergencySlidesCancelBtn" class="btn-secondary">Закрыть</button>
             </div>
         </div>
     </div>
@@ -682,6 +876,19 @@
             window.location.replace('main.html');
         }
         let currentUserRole = '';
+        let slidesCatalog = [];
+        let emergencyMenuOpenedFromUrl = false;
+
+        const EMERGENCY_PRESETS = [
+            { key: 'fire', label: 'Пожарная тревога' },
+            { key: 'smoke', label: 'Задымление' },
+            { key: 'uav_attack', label: 'Опасность атаки БПЛА' },
+            { key: 'missile_alert', label: 'Ракетная опасность' },
+            { key: 'evacuation', label: 'Эвакуация' },
+            { key: 'chemical_hazard', label: 'Химическая опасность' }
+        ];
+
+        const emergencySlidesModal = document.getElementById('emergencySlidesModal');
 
         function clearAuthAndRedirect() {
             sessionStorage.removeItem(TOKEN_KEY);
@@ -760,6 +967,177 @@
             window.location.href = 'editor.html';
         });
 
+        function emergencyPresetByKey(key) {
+            return EMERGENCY_PRESETS.find(function(item) { return item.key === key; }) || null;
+        }
+
+        function emergencyTypeLabel(slide) {
+            const preset = emergencyPresetByKey(String(slide.alarm_type || ''));
+            return preset ? preset.label : (slide.alarm_type || 'Пользовательский тип');
+        }
+
+        function emergencyEditorUrl(options = {}) {
+            const params = new URLSearchParams();
+            params.set('return', 'emergency');
+            if (options.id) {
+                params.set('id', String(options.id));
+            } else {
+                params.set('emergency', '1');
+                params.set('alarm_type', options.alarmType || 'custom');
+                params.set('name', options.name || 'Новый аварийный шаблон');
+            }
+            return 'editor.html?' + params.toString();
+        }
+
+        function createEmergencyTemplate(alarmType, name) {
+            window.location.href = emergencyEditorUrl({ alarmType, name });
+        }
+
+        function editEmergencyTemplate(id) {
+            window.location.href = emergencyEditorUrl({ id });
+        }
+
+        function isEmergencySlideRunning(slide) {
+            return Boolean(slide && slide.is_emergency && getSlideStatus(slide).key === 'showing');
+        }
+
+        function showEmergencyMessage(text, type = '') {
+            const message = document.getElementById('emergencySlidesMessage');
+            message.textContent = text;
+            message.className = 'form-message' + (type ? ' ' + type : '');
+        }
+
+        function renderEmergencyTemplateCard(slide, preset) {
+            if (!slide) {
+                const safeKey = JSON.stringify(preset.key);
+                const safeLabel = JSON.stringify(preset.label);
+                return '<div class="emergency-template-card missing">' +
+                    '<div class="emergency-template-type">' + escapeHtml(preset.label) + '</div>' +
+                    '<div class="emergency-template-title">Шаблон не создан</div>' +
+                    '<div class="emergency-template-status">Сначала подготовьте содержимое и инструкции для экранов.</div>' +
+                    '<div class="emergency-template-actions">' +
+                        '<button type="button" class="emergency-create-btn" onclick="createEmergencyTemplate(' + safeKey.replace(/"/g, '&quot;') + ',' + safeLabel.replace(/"/g, '&quot;') + ')">Создать шаблон</button>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            const running = isEmergencySlideRunning(slide);
+            const status = running
+                ? 'СЕЙЧАС ПОКАЗЫВАЕТСЯ'
+                : slide.is_active
+                    ? getSlideStatus(slide).label
+                    : 'Готов к быстрому запуску';
+            const toggleButton = running
+                ? '<button type="button" class="emergency-stop-btn" onclick="setEmergencyTemplateActive(' + Number(slide.id) + ', false, this)">Остановить</button>'
+                : '<button type="button" class="emergency-launch-btn" onclick="setEmergencyTemplateActive(' + Number(slide.id) + ', true, this)">Запустить</button>';
+
+            return '<div class="emergency-template-card' + (running ? ' active' : '') + '">' +
+                '<div class="emergency-template-type">' + escapeHtml(emergencyTypeLabel(slide)) + '</div>' +
+                '<div class="emergency-template-title">' + escapeHtml(slide.name || 'Без названия') + '</div>' +
+                '<div class="emergency-template-status">' + escapeHtml(status) + '</div>' +
+                '<div class="emergency-template-actions">' +
+                    toggleButton +
+                    '<button type="button" class="emergency-edit-btn" onclick="editEmergencyTemplate(' + Number(slide.id) + ')">Редактор</button>' +
+                    '<button type="button" class="emergency-delete-btn" onclick="deleteEmergencyTemplate(' + Number(slide.id) + ')">Удалить</button>' +
+                '</div>' +
+            '</div>';
+        }
+
+        function renderEmergencyMenu() {
+            const grid = document.getElementById('emergencyTemplatesGrid');
+            const emergencySlides = slidesCatalog.filter(function(slide) { return slide.is_emergency; });
+            const byType = new Map();
+
+            emergencySlides.forEach(function(slide) {
+                const key = String(slide.alarm_type || 'custom');
+                if (!byType.has(key)) byType.set(key, []);
+                byType.get(key).push(slide);
+            });
+
+            const cards = [];
+            EMERGENCY_PRESETS.forEach(function(preset) {
+                const matches = byType.get(preset.key) || [];
+                if (!matches.length) {
+                    cards.push(renderEmergencyTemplateCard(null, preset));
+                } else {
+                    matches.forEach(function(slide) { cards.push(renderEmergencyTemplateCard(slide, preset)); });
+                }
+                byType.delete(preset.key);
+            });
+
+            for (const slides of byType.values()) {
+                slides.forEach(function(slide) { cards.push(renderEmergencyTemplateCard(slide, null)); });
+            }
+
+            grid.innerHTML = cards.join('');
+
+            const running = emergencySlides.filter(isEmergencySlideRunning);
+            const summary = document.getElementById('emergencyActiveSummary');
+            summary.classList.toggle('hidden', running.length === 0);
+            summary.textContent = running.length
+                ? 'Экстренный режим активен. Сейчас показываются: ' + running.map(function(slide) { return slide.name; }).join(', ')
+                : '';
+        }
+
+        function openEmergencyMenu() {
+            showEmergencyMessage('');
+            renderEmergencyMenu();
+            emergencySlidesModal.classList.remove('hidden');
+        }
+
+        function closeEmergencyMenu() {
+            emergencySlidesModal.classList.add('hidden');
+            showEmergencyMessage('');
+        }
+
+        async function setEmergencyTemplateActive(id, shouldActivate, button) {
+            if (button) button.disabled = true;
+            showEmergencyMessage(shouldActivate ? 'Запуск аварийного слайда…' : 'Остановка аварийного слайда…');
+            try {
+                const action = shouldActivate ? 'activate' : 'deactivate';
+                const response = await apiFetch('/slides/' + id + '/emergency/' + action, { method: 'POST' });
+                if (!response.ok) {
+                    const error = await response.json().catch(function() { return {}; });
+                    throw new Error(error.detail || 'Не удалось изменить аварийный режим');
+                }
+                await loadSlides();
+                renderEmergencyMenu();
+                showEmergencyMessage(shouldActivate ? 'Аварийный слайд запущен' : 'Аварийный слайд остановлен', 'success');
+            } catch (error) {
+                if (error.message === 'Сессия истекла') return;
+                showEmergencyMessage(error.message || 'Ошибка управления аварийным слайдом', 'error');
+            } finally {
+                if (button) button.disabled = false;
+            }
+        }
+
+        async function deleteEmergencyTemplate(id) {
+            if (!confirm('Удалить аварийный шаблон без возможности восстановления?')) return;
+            try {
+                const response = await apiFetch('/slides/' + id, { method: 'DELETE' });
+                if (!response.ok) {
+                    const error = await response.json().catch(function() { return {}; });
+                    throw new Error(error.detail || 'Не удалось удалить шаблон');
+                }
+                await loadSlides();
+                renderEmergencyMenu();
+                showEmergencyMessage('Аварийный шаблон удалён', 'success');
+            } catch (error) {
+                if (error.message === 'Сессия истекла') return;
+                showEmergencyMessage(error.message || 'Ошибка удаления шаблона', 'error');
+            }
+        }
+
+        document.getElementById('openEmergencySlidesBtn').addEventListener('click', openEmergencyMenu);
+        document.getElementById('emergencySlidesCloseBtn').addEventListener('click', closeEmergencyMenu);
+        document.getElementById('emergencySlidesCancelBtn').addEventListener('click', closeEmergencyMenu);
+        document.getElementById('createCustomEmergencyTemplateBtn').addEventListener('click', function() {
+            createEmergencyTemplate('custom', 'Новый аварийный шаблон');
+        });
+        emergencySlidesModal.addEventListener('click', function(event) {
+            if (event.target === emergencySlidesModal) closeEmergencyMenu();
+        });
+
         function editSlide(id) {
             window.location.href = 'editor.html?id=' + encodeURIComponent(id);
         }
@@ -800,7 +1178,14 @@
                     throw new Error('Не удалось загрузить слайды');
                 }
                 const slides = await response.json();
+                slidesCatalog = slides;
                 renderSlides(slides);
+                if (!emergencySlidesModal.classList.contains('hidden')) renderEmergencyMenu();
+                if (!emergencyMenuOpenedFromUrl && new URLSearchParams(window.location.search).get('emergency') === '1') {
+                    emergencyMenuOpenedFromUrl = true;
+                    openEmergencyMenu();
+                    window.history.replaceState({}, '', 'admin.html');
+                }
                 showSlidesMessage('');
             } catch (error) {
                 if (error.message === 'Сессия истекла') return;

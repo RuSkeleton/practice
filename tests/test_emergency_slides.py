@@ -206,3 +206,77 @@ def test_screen_schedule_response_contains_emergency_queue() -> None:
     finally:
         db.close()
 
+
+
+def test_quick_activation_starts_prepared_emergency_template() -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db = _session()
+    try:
+        template = crud.create_slide(
+            db,
+            _slide_payload(
+                now,
+                name="Пожарная тревога",
+                is_active=False,
+                is_emergency=True,
+                alarm_type="fire",
+                start_date=now - timedelta(days=2),
+                end_date=now - timedelta(days=1),
+            ),
+        )
+        original_revision = template.revision
+
+        activated = crud.activate_emergency_slide(db, template.id, user_id=12)
+
+        assert activated is not None
+        assert activated.is_active is True
+        assert activated.is_emergency is True
+        assert activated.start_date <= datetime.now(timezone.utc).replace(tzinfo=None)
+        assert activated.end_date > activated.start_date + timedelta(days=3000)
+        assert activated.duration_slots == 1
+        assert activated.frequency_mode == 1
+        assert activated.hard_interval is None
+        assert activated.revision == original_revision + 1
+        assert activated.updated_by == 12
+    finally:
+        db.close()
+
+
+def test_quick_deactivation_keeps_emergency_template_for_reuse() -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db = _session()
+    try:
+        template = crud.create_slide(
+            db,
+            _slide_payload(
+                now,
+                is_emergency=True,
+                alarm_type="smoke",
+            ),
+        )
+
+        stopped = crud.deactivate_emergency_slide(db, template.id, user_id=4)
+
+        assert stopped is not None
+        assert stopped.is_active is False
+        assert stopped.is_emergency is True
+        assert stopped.alarm_type == "smoke"
+        assert stopped.updated_by == 4
+    finally:
+        db.close()
+
+
+def test_quick_activation_rejects_normal_slide() -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db = _session()
+    try:
+        slide = crud.create_slide(db, _slide_payload(now, is_emergency=False))
+
+        try:
+            crud.activate_emergency_slide(db, slide.id)
+        except ValueError as exc:
+            assert "только для аварийного" in str(exc)
+        else:
+            raise AssertionError("Обычный слайд не должен запускаться через аварийную панель")
+    finally:
+        db.close()

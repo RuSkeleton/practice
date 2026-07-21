@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import func
@@ -122,6 +122,59 @@ def delete_slide(db: Session, slide_id: int) -> bool:
     db.delete(db_slide)
     db.commit()
     return True
+
+
+def activate_emergency_slide(
+    db: Session,
+    slide_id: int,
+    user_id: Optional[int] = None,
+):
+    """Немедленно запускает заранее подготовленный аварийный шаблон.
+
+    Конечная дата остаётся технически обязательной по контракту слайда, поэтому
+    быстрый запуск продлевает её на десять лет. Фактически показ прекращается
+    вручную через deactivate_emergency_slide.
+    """
+    db_slide = get_slide(db, slide_id)
+    if db_slide is None:
+        return None
+    if not db_slide.is_emergency:
+        raise ValueError("Быстрый запуск доступен только для аварийного слайда")
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_slide.start_date = now
+    db_slide.end_date = now + timedelta(days=3650)
+    db_slide.is_active = True
+    db_slide.duration_slots = 1
+    db_slide.frequency_mode = 1
+    db_slide.hard_interval = None
+    db_slide.revision += 1
+    db_slide.updated_by = user_id
+
+    db.commit()
+    db.refresh(db_slide)
+    return db_slide
+
+
+def deactivate_emergency_slide(
+    db: Session,
+    slide_id: int,
+    user_id: Optional[int] = None,
+):
+    """Останавливает аварийный шаблон, не удаляя его из каталога."""
+    db_slide = get_slide(db, slide_id)
+    if db_slide is None:
+        return None
+    if not db_slide.is_emergency:
+        raise ValueError("Остановка через аварийную панель доступна только для аварийного слайда")
+
+    db_slide.is_active = False
+    db_slide.revision += 1
+    db_slide.updated_by = user_id
+
+    db.commit()
+    db.refresh(db_slide)
+    return db_slide
 
 
 # ---------------------------------------------------------------------------

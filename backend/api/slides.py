@@ -84,6 +84,60 @@ def update_slide(
     return db_slide
 
 
+@router.post(
+    "/slides/{slide_id}/emergency/activate",
+    response_model=schemas.SlideOut,
+)
+def activate_emergency_slide(
+    slide_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_hr_or_admin),
+):
+    try:
+        db_slide = crud.activate_emergency_slide(db, slide_id, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if db_slide is None:
+        raise HTTPException(status_code=404, detail="Слайд не найден")
+
+    background_tasks.add_task(regenerate_schedule_and_notify)
+    background_tasks.add_task(
+        notify_slides_updated,
+        [db_slide.id],
+        "emergency_slide_activated",
+    )
+    return db_slide
+
+
+@router.post(
+    "/slides/{slide_id}/emergency/deactivate",
+    response_model=schemas.SlideOut,
+)
+def deactivate_emergency_slide(
+    slide_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_hr_or_admin),
+):
+    try:
+        db_slide = crud.deactivate_emergency_slide(db, slide_id, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if db_slide is None:
+        raise HTTPException(status_code=404, detail="Слайд не найден")
+
+    background_tasks.add_task(regenerate_schedule_and_notify)
+    background_tasks.add_task(
+        notify_slides_updated,
+        [db_slide.id],
+        "emergency_slide_deactivated",
+    )
+    return db_slide
+
+
 @router.delete("/slides/{slide_id}")
 def delete_slide(
     slide_id: int,
